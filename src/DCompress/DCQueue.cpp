@@ -2,6 +2,8 @@
 #include <chrono>
 #include <thread>
 #include <cstring>
+#include <bits/unique_ptr.h>
+
 
 #include "../../include/Dcompress/DCQueue.h"
 
@@ -23,17 +25,18 @@ DCQueue::DCQueue(DCBuffer &buffer, int queue_size, int matrix_size) : buf_ref(bu
 /**
  * @brief method for building matrix queue of specified size(got from constructor)
  * 
- * @param buf_delay delay in seconds for getting data from buffer
- * @param queue_delay delay in seconds for building wanted matrix
+ * @param buf_delay delay for getting data from buffer(in seconds, accept float values)
+ * @param queue_delay delay for building wanted matrix(in seconds, accept float values)
+ * @see DCBuffer::next_chunk()
  * @note if the delay is passed, this method return the effective size of the queue build
  * 
  * @return queue_size if all okay or build matrix number if the delay is passed 
  */
-int DCQueue::build(int buf_delay, int queue_delay)
+int DCQueue::build(double buf_delay, double queue_delay)
 {
     int rest_size = 0;
-    uint8_t *rest_buffer = nullptr;
-    uint8_t *all_data = nullptr;
+    auto rest_buffer = std::unique_ptr<uint8_t[]>();
+    auto all_data = std::unique_ptr<uint8_t[]>();
     int matrix_len = this->matrix_size * this->matrix_size;
 
     auto sc = std::chrono::steady_clock();
@@ -42,13 +45,13 @@ int DCQueue::build(int buf_delay, int queue_delay)
     while(this->counter != this->queue_size)
     {
         int data_size = 0;
-        uint8_t *data_chunk = this->buf_ref.next_chunk(data_size, buf_delay);
+        const std::unique_ptr<uint8_t[]> &data_chunk(this->buf_ref.next_chunk(data_size, buf_delay));
 
-        delete[] all_data;
         int all_data_size = rest_size + data_size;        
-        all_data = new uint8_t[all_data_size];
-        std::memcpy(all_data, rest_buffer, rest_size);
-        std::memcpy(all_data + rest_size, data_chunk, data_size);
+        all_data.reset(new uint8_t[all_data_size]);
+
+        std::memcpy(all_data.get(), rest_buffer.get(), rest_size);
+        std::memcpy(all_data.get() + rest_size, data_chunk.get(), data_size);
 
         int eff_build = 0;
         int can_build = std::floor((all_data_size) / matrix_len);
@@ -56,15 +59,14 @@ int DCQueue::build(int buf_delay, int queue_delay)
         eff_build = (this->counter + can_build <= this->queue_size) ? can_build : this->counter + can_build - this->queue_size;
         for(int i = 0; i < eff_build; ++i)
         {
-            this->push_back({this->counter, DCMatrix(all_data + (i * matrix_len), matrix_len)});
+            this->push_back({this->counter, DCMatrix(all_data.get() + (i * matrix_len), matrix_len)});
             ++this->counter;
         }
 
         rest_size = all_data_size - (eff_build * matrix_len);
 
-        delete[] rest_buffer;
-        rest_buffer = new uint8_t[rest_size];
-        std::memcpy(rest_buffer, all_data + all_data_size - rest_size, rest_size);
+        rest_buffer.reset(new uint8_t[rest_size]);
+        std::memcpy(rest_buffer.get(), all_data.get() + all_data_size - rest_size, rest_size);
 
         if(static_cast<std::chrono::duration<double>>(sc.now() - start).count() > queue_delay) // if delay expired
             break;
@@ -75,14 +77,14 @@ int DCQueue::build(int buf_delay, int queue_delay)
         int can_rest_build = std::floor(rest_size / matrix_len);
         for(int i = 0; i < can_rest_build; ++i)
         {
-            this->push_back({this->counter, DCMatrix(rest_buffer + (i * matrix_len), matrix_len)});
+            this->push_back({this->counter, DCMatrix(rest_buffer.get() + (i * matrix_len), matrix_len)});
             ++this->counter;
         }
 
         int f_rest_size = rest_size - can_rest_build * matrix_len;
         uint8_t *tmp_buf = new uint8_t[matrix_len];
         std::memset(tmp_buf, 0, matrix_len);
-        std::memcpy(tmp_buf, rest_buffer + (can_rest_build * matrix_len), f_rest_size);
+        std::memcpy(tmp_buf, rest_buffer.get() + (can_rest_build * matrix_len), f_rest_size);
 
         ++this->counter;
         this->push_back({this->counter, DCMatrix(tmp_buf, matrix_len)});
@@ -95,9 +97,6 @@ int DCQueue::build(int buf_delay, int queue_delay)
         delete[] tmp_buf;
     }
     
-    delete[] rest_buffer;
-    delete[] all_data;
-
     return this->counter;
 }
 

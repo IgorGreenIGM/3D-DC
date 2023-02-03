@@ -1,7 +1,6 @@
-
-#include <cstring>
 #include <thread>
 #include <chrono>
+#include <cstring>
 
 #include "../../include/Dcompress/DCBuffer.h"
 
@@ -16,7 +15,7 @@
 DCBuffer::DCBuffer(std::string file_path, int buffer_size)
 {
     this->buffer_size = buffer_size; // buffer size
-    this->mem_buf = new uint8_t[this->buffer_size]; // buffer memory allocation
+    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
     this->in_fstream = std::ifstream(file_path.c_str(), std::ios::binary | std::ios::in);  // opening file stream
 
     if(!in_fstream.is_open())
@@ -41,7 +40,7 @@ DCBuffer::DCBuffer(std::string file_path, int buffer_size)
 DCBuffer::DCBuffer(uint8_t *mem_ptr, int mem_size, int buffer_size)
 {
     this->buffer_size = buffer_size; // buffer size
-    this->mem_buf = new uint8_t[this->buffer_size]; // buffer memory allocation
+    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
     this->in_mstream = mem_ptr; // storing input memory stream 
 
     this->locked = true;
@@ -58,8 +57,6 @@ DCBuffer::DCBuffer(uint8_t *mem_ptr, int mem_size, int buffer_size)
  */
 DCBuffer::~DCBuffer()
 {
-    delete[] this->mem_buf;
-
     if(this->in_fstream.is_open())
         this->in_fstream.close();
 }
@@ -72,12 +69,12 @@ DCBuffer::~DCBuffer()
  * @note it is the programmer responsability to copy the output, cause it will be overrrided in the next call of next_chunk() or next_chunk_force()
  * 
  * @param out_chunk_size output value of the chunk size.
- * @return uint8_t* data chunk pointer or nullptr if there is nothing else to read
+ * @return reference to pointer handler of data chunk pointer
  */
-uint8_t* DCBuffer::next_chunk_force(int &out_chunk_size)
+const std::unique_ptr<uint8_t[]> &DCBuffer::next_chunk_force(int &out_chunk_size)
 {
     if (this->countdown == -1) // -1 means that there is no more data to read
-        return nullptr;
+        return std::unique_ptr<uint8_t[]>(nullptr);
     
     if (this->work_mode == f_mode) // file stream working mode
     {   
@@ -108,7 +105,7 @@ uint8_t* DCBuffer::next_chunk_force(int &out_chunk_size)
         if((this->m_stream_size - this->next_mrd_pos) < this->buffer_size)
         {
 
-            std::memcpy(this->mem_buf + this->next_mrd_pos, this->in_mstream + this->next_mrd_pos, this->m_stream_size);
+            std::memcpy(this->mem_buf.get() + this->next_mrd_pos, this->in_mstream + this->next_mrd_pos, this->m_stream_size);
             this->locked = false; // force buffer unlocking
             this->countdown = -1;
             this->next_mrd_pos += this->m_stream_size;
@@ -116,7 +113,7 @@ uint8_t* DCBuffer::next_chunk_force(int &out_chunk_size)
         }
         else
         {
-            std::memcpy(this->mem_buf + this->next_mrd_pos, this->in_mstream + this->next_mrd_pos, this->buffer_size);
+            std::memcpy(this->mem_buf.get() + this->next_mrd_pos, this->in_mstream + this->next_mrd_pos, this->buffer_size);
             this->locked = false;
             this->countdown = this->buffer_size;
             this->next_mrd_pos += this->buffer_size;
@@ -136,10 +133,10 @@ uint8_t* DCBuffer::next_chunk_force(int &out_chunk_size)
  * @see DCBuffer::ready()
  * 
  * @param out_chunk_size output value of the chunk size.
- * @param delay the delay time in seconds until force memory buffer unlock
+ * @param delay the delay time until force memory buffer unlock.(in seconds, accept float values)
  * @return uint8_t* data chunk pointer
  */
-uint8_t* DCBuffer::next_chunk(int &out_chunk_size, int delay)
+const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, double delay)
 {   
     if (this->work_mode == f_mode) // file stream working mode
     {   
@@ -159,7 +156,7 @@ uint8_t* DCBuffer::next_chunk(int &out_chunk_size, int delay)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(500)); // sleep the thread for 0.5sec
 
-            this->in_fstream.clear(); // clearing eof error,
+            this->in_fstream.clear(); // clearing eof error, so be able to read next added datas
             if(this->in_fstream >> std::noskipws >> mem_buf[i])
             {
                 ++i;

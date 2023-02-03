@@ -1,9 +1,10 @@
 # ifndef _DC_BUFFER_H_INCLUDED_
 #define _DC_BUFFER_H_INCLUDED_
 
-#include <iostream>
-#include <fstream>
 #include <string>
+#include <fstream>
+#include <iostream>
+#include <bits/unique_ptr.h>
 
 #define f_mode 0XA // working mode = filestream
 #define m_mode 0XF // working mode = memstream
@@ -19,11 +20,11 @@ class DCBuffer
         int get_size();
         void update_mstream(int new_mem_size, uint8_t *new_mem_ptr);
 
-        uint8_t *next_chunk_force(int &out_chunk_size);
-        uint8_t *next_chunk(int &out_chunk_size, int delay);
+        const std::unique_ptr<uint8_t[]> &next_chunk_force(int &out_chunk_size);
+        const std::unique_ptr<uint8_t[]> &next_chunk(int &out_chunk_size, double delay);
 
     private:
-        uint8_t *mem_buf; // internal data handler, fixed size
+        std::unique_ptr<uint8_t[]> mem_buf; // internal data handler, fixed size
         int buffer_size; // size of the data handler
 
         uint8_t *in_mstream; // input memory stream

@@ -2,7 +2,7 @@
 
 CC = g++
 # compiling in 64 bits
-CFLAGS = -m64 -std=c++17 -O3
+CFLAGS = -m64 -std=c++17 -g
 LDFLAGS = -m64 -L"./lib" 
 EXEC = bin/output.exe
 
