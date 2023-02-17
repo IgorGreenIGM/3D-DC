@@ -4,25 +4,28 @@
 #include <vector>
 #include <iostream>
 
-
 class DCMatrix : private std::vector<std::vector<uint8_t>>
 {
     public :
-        DCMatrix(std::initializer_list<uint8_t> &list);
-        DCMatrix(std::vector<std::vector<uint8_t>> &matrix);
+        explicit DCMatrix(const std::initializer_list<uint8_t> &list);
+        explicit DCMatrix(const std::vector<std::vector<uint8_t>> &matrix);
         DCMatrix(uint8_t *buffer, int buf_size);
         DCMatrix();
         ~DCMatrix();
 
-        bool next_disp();
-        bool prev_disp();
-        void print();
+        void print() const noexcept;
+        bool next_disp() noexcept;
+        bool prev_disp() noexcept;
+        uint8_t at(int line, int col) const;
+
+        friend class DCQueue;
 
     private :
         int size; // the size is the number of elements in each line and each colum, then the total is (size*size)
         int col_disp_count; // actual column disposition counter (default is 0). 
         int line_disp_count; // actual lines disposition counter (default is 0).
         int disp_limit; // disposition limit count, typically (n!) for lines and (n!) for columns. 
+
 };
 
 

@@ -12,14 +12,13 @@
  * @param buffer_size wanted size of the buffer
  * @exception std::runtime_error if can't open file specified at path
  */
-DCBuffer::DCBuffer(std::string file_path, int buffer_size)
+DCBuffer::DCBuffer(const std::string &file_path, int buffer_size)
 {
     this->buffer_size = buffer_size; // buffer size
-    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
     this->in_fstream = std::ifstream(file_path.c_str(), std::ios::binary | std::ios::in);  // opening file stream
 
-    if(!in_fstream.is_open())
-        throw std::runtime_error("Error impossible to open file specified ad location" + file_path);
+    if(not in_fstream.is_open())
+        throw std::runtime_error("Error, impossible to open file specified at location : " + file_path);
     
     this->locked = true;
     this->next_mrd_pos = 0;
@@ -40,7 +39,6 @@ DCBuffer::DCBuffer(std::string file_path, int buffer_size)
 DCBuffer::DCBuffer(uint8_t *mem_ptr, int mem_size, int buffer_size)
 {
     this->buffer_size = buffer_size; // buffer size
-    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
     this->in_mstream = mem_ptr; // storing input memory stream 
 
     this->locked = true;
@@ -66,21 +64,21 @@ DCBuffer::~DCBuffer()
  * @brief method to get the chunk of data from streams(file or memory), force mode.
  * @details if the datas are not avaible at the moment of call, this method will force the buffer unlocking, then the output chunk length will be 
  * stored in the out_chunk_size var.
- * @note it is the programmer responsability to copy the output, cause it will be overrrided in the next call of next_chunk() or next_chunk_force()
+ * @note it is the programmer responsability to manage the output, cause it is moved from internal datas handler at return
  * 
  * @param out_chunk_size output value of the chunk size.
- * @return reference to pointer handler of data chunk pointer
+ * @return std::unique_ptr<uint8_t[]> 
  */
-const std::unique_ptr<uint8_t[]> &DCBuffer::next_chunk_force(int &out_chunk_size)
+std::unique_ptr<uint8_t[]> DCBuffer::next_chunk_force(int &out_chunk_size) noexcept
 {
-    if (this->countdown == -1) // -1 means that there is no more data to read
-        return std::unique_ptr<uint8_t[]>(nullptr);
-    
+    // cause this method move datas from internal handler, it's necessarry to each call from necessary memory
+    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
+
     if (this->work_mode == f_mode) // file stream working mode
     {   
         // copying stream data in internal data handler
         int i = 0;
-        while (this->in_fstream >> std::noskipws >> this->mem_buf[i] && this->countdown != 0) 
+        while (this->in_fstream >> std::noskipws >> this->mem_buf[i] and this->countdown != 0) 
         {
             ++i;
             --this->countdown;
@@ -120,29 +118,31 @@ const std::unique_ptr<uint8_t[]> &DCBuffer::next_chunk_force(int &out_chunk_size
             out_chunk_size = this->buffer_size;
         }
     }
-    return this->mem_buf;
+
+    return std::move(this->mem_buf);
 }
 
 
 /**
  * @brief method to get the chunk of data from streams(file or memory).
- * @details if the datas are not avaible at the moment of call, will wait until the delay time is exceeded
- * @note it is the programmer responsability to copy the output, cause it will be overrided in the next call of next_chunk() or next_chunk_force()
+ * @note it is the programmer responsability to manage the output, cause it is move from internal datas handler before returned
  * @note you can get the state of the buffer with the ready() method.
- * @warning never free the result of this method or it will free the whole buffer internal memory and get an unexpected behavior
  * @see DCBuffer::ready()
  * 
  * @param out_chunk_size output value of the chunk size.
- * @param delay the delay time until force memory buffer unlock.(in seconds, accept float values)
- * @return uint8_t* data chunk pointer
+ * @param delay the delay time until force memory buffer unlock(unit = sec) and release datas
+ * @return std::unique_ptr<uint8_t[]>
  */
-const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, double delay)
+std::unique_ptr<uint8_t[]> DCBuffer::next_chunk(int &out_chunk_size, double delay) noexcept
 {   
+    // cause this method move datas from internal handler, it's necessarry to each call from necessary memory
+    this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
+
     if (this->work_mode == f_mode) // file stream working mode
     {   
         // copying avaible stream data in internal data handler
         int i = 0;
-        while (this->in_fstream >> std::noskipws >> this->mem_buf[i] && this->countdown != 0) // reading avaible datas
+        while (this->in_fstream >> std::noskipws >> this->mem_buf[i] and this->countdown != 0) // reading avaible datas
         {
             ++i;
             --this->countdown;
@@ -154,8 +154,6 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
         auto start = sc.now();
         while(this->countdown != 0) // while the buffer is not full
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // sleep the thread for 0.5sec
-
             this->in_fstream.clear(); // clearing eof error, so be able to read next added datas
             if(this->in_fstream >> std::noskipws >> mem_buf[i])
             {
@@ -168,7 +166,7 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
                 this->locked = false; // force buffer unlocking
                 out_chunk_size = i;
 
-                return this->mem_buf;
+                return std::move(this->mem_buf);
             }
         }
 
@@ -180,7 +178,7 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
     else // memory stream working mode
     {
         int i = 0;
-        while(i + this->next_mrd_pos < this->m_stream_size && this->countdown != 0)
+        while(i + this->next_mrd_pos < this->m_stream_size and this->countdown != 0)
         {   
             this->mem_buf[i] = this->in_mstream[i];
             ++i;
@@ -191,7 +189,6 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
         auto start = sc.now();
         while(this->countdown != 0) // while the buffer is not full
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // sleep the thread for 0.5sec
             if(i + this->next_mrd_pos < this->m_stream_size)
             {
                 ++i;
@@ -203,7 +200,7 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
                 this->locked = false; // force buffer unlocking
                 out_chunk_size = i;
                 this->next_mrd_pos += i;
-                return this->mem_buf;
+                return std::move(this->mem_buf);
             }            
         }
         // if the buffer is full
@@ -212,7 +209,7 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
         out_chunk_size = this->buffer_size;
         this->next_mrd_pos += this->buffer_size;
     }
-    return this->mem_buf;
+    return std::move(this->mem_buf);
 }
 
 
@@ -221,7 +218,7 @@ const std::unique_ptr<uint8_t[]>& DCBuffer::next_chunk(int &out_chunk_size, doub
  * 
  * @return size of the buffer
  */
-int DCBuffer::get_size()
+int DCBuffer::get_size() const noexcept
 {
     return this->buffer_size;
 }
@@ -232,7 +229,7 @@ int DCBuffer::get_size()
  * @return true if the buffer is ready, ie the buffer is full
  * @return false if the buffer is not ready, ie the buffer is not yet full
  */
-bool DCBuffer::ready()
+bool DCBuffer::ready() const noexcept
 {
     return (!this->locked);
 }
@@ -242,7 +239,7 @@ bool DCBuffer::ready()
  * @param new_mem_size new input memory buffer size 
  * @param new_mem_ptr new input memory buffer. nullptr by default if the stream doesn't changed
  */
-void DCBuffer::update_mstream(int new_mem_size, uint8_t *new_mem_ptr = nullptr)
+void DCBuffer::update_mstream(int new_mem_size, uint8_t *new_mem_ptr = nullptr) noexcept
 {
     if(new_mem_ptr != nullptr)
         this->in_mstream = new_mem_ptr;

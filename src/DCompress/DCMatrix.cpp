@@ -17,7 +17,7 @@ DCMatrix::DCMatrix()
  * @param list initializer_list
  * @exception std::runtime_error() if the size of the initializer_list is not a perfect square.
  */
-DCMatrix::DCMatrix(std::initializer_list<uint8_t> &list)
+DCMatrix::DCMatrix(const std::initializer_list<uint8_t> &list)
 {    
     if(std::ceil(std::sqrt(list.size())) != std::floor(std::sqrt(list.size()))) // checking if perfect square...
         throw std::runtime_error("Invalid size in constructor, must be a perfect square");
@@ -47,7 +47,7 @@ DCMatrix::DCMatrix(std::initializer_list<uint8_t> &list)
  * @param matrix input matrix
  * @exception std::runtime_error() if number of lines in the matrix is not equals to number of columns.
  */
-DCMatrix::DCMatrix(std::vector<std::vector<uint8_t>> &matrix)
+DCMatrix::DCMatrix(const std::vector<std::vector<uint8_t>> &matrix)
 {
     this->col_disp_count = 0;
     this->line_disp_count = 0;
@@ -67,7 +67,7 @@ DCMatrix::DCMatrix(std::vector<std::vector<uint8_t>> &matrix)
  * @brief Construct a new DCMatrix::DCMatrix object, from input buffer
  * 
  * @param buffer input buffer
- * @param len input buffer len
+ * @param buf_size input buffer size
  * @exception std::runtime_error() if the size of the buffer is not a perfect square.
  */
 DCMatrix::DCMatrix(uint8_t *buffer, int buf_size)
@@ -105,7 +105,7 @@ DCMatrix::~DCMatrix()
  * @details to get the next disposition of the matrix, we get the next disposition of each line, and the next columns disposition.
  * @return true if it is another next disposition avaible, false else.
  */
-bool DCMatrix::next_disp()
+bool DCMatrix::next_disp() noexcept
 {
     // switching lines dispositions
     for(auto it = this->begin(); it != this->end(); ++it)
@@ -115,10 +115,10 @@ bool DCMatrix::next_disp()
     // switching comlumns dispositions
     std::next_permutation(this->begin(), this->end(), [](const std::vector<uint8_t>&v1, const std::vector<uint8_t>&v2)
                                                         {
-                                                                return (v1[0] < v2[0]);
+                                                               return (v1[0] < v2[0]);
                                                         });
     ++this->col_disp_count;    
-    return this->line_disp_count != disp_limit && this->col_disp_count != disp_limit;
+    return this->line_disp_count != disp_limit and this->col_disp_count != disp_limit;
 }
 
 /**
@@ -126,7 +126,7 @@ bool DCMatrix::next_disp()
  * @details to get the previous disposition of the matrix, we get the previous disposition of each line, and the previous columns disposition.
  * @return true if it is another previous disposition avaible, false else.
  */
-bool DCMatrix::prev_disp()
+bool DCMatrix::prev_disp() noexcept
 {
     // switching lines dispositions
     for(auto it = this->begin(); it != this->end(); ++it)
@@ -140,14 +140,14 @@ bool DCMatrix::prev_disp()
                                                       });
     ++this->col_disp_count;
 
-    return this->line_disp_count != disp_limit && this->col_disp_count == disp_limit;
+    return this->line_disp_count != disp_limit and this->col_disp_count == disp_limit;
 }
 
 /**
  * @brief print the matrix to
  * 
  */
-void DCMatrix::print()
+void DCMatrix::print() const noexcept
 {
     for(auto it1 = this->begin(); it1 != this->end(); ++it1)
     {
@@ -157,3 +157,21 @@ void DCMatrix::print()
         std::cout << "\n";
     }
 }
+
+
+/**
+ * @brief overriding the std::vector::at() method
+ * 
+ * @param line line of the matrix
+ * @param col col of the matrix
+ * 
+ * @return value at specified position
+ * @exception std::runtime_error if the matrix bounds are violated
+ */
+uint8_t DCMatrix::at(int line, int col) const
+{
+    if (line < 0 or line >= this->size or col < 0 or col >= this->size)
+        throw std::runtime_error("error invalid matrix input : line=" + std::to_string(line) + " col=" + std::to_string(col));
+
+    return (*this)[line][col];
+}   
