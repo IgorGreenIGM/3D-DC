@@ -1,14 +1,10 @@
 #include <cmath>
 #include <algorithm>
 
-#include "../../include/Dcompress/DCMatrix.h"
+#include "../../include/Dcompress/DCMatrix.hpp"
 
-DCMatrix::DCMatrix()
+DCMatrix::DCMatrix() : size(0), col_disp_count(0), line_disp_count(0), disp_limit(0)
 {
-    this->size = 0;
-    this->col_disp_count = 0;
-    this->line_disp_count = 0;
-    this->disp_limit = 0;
 }
 
 /**
@@ -80,11 +76,10 @@ DCMatrix::DCMatrix(uint8_t *buffer, int buf_size)
     this->size = static_cast<int>(std::sqrt(buf_size));
     this->disp_limit = fact(this->size); // limit for disposition counters
 
-
     std::vector<uint8_t> tmp;
     for(int i = 0; i < buf_size; ++i) // copying initializer_list elements into the matrix
     {
-        for(int j = 0; j < this->size; ++j)
+        for(std::size_t j = 0; j < this->size; ++j)
         {
             tmp.push_back(buffer[i]);
             ++i;
@@ -175,3 +170,19 @@ uint8_t DCMatrix::at(int line, int col) const
 
     return (*this)[line][col];
 }   
+
+/**
+ * @brief get linearly the content of the matrix
+ * 
+ * @return std::vector<uint8_t> 
+ */
+std::vector<uint8_t> DCMatrix::get_linear() const noexcept
+{
+    std::vector<uint8_t> out;
+    
+    for(int line = 0; line < this->size; ++line)
+        for (int col = 0; col < this->size; ++col)
+            out.push_back((*this)[line][col]);
+
+    return out;
+}

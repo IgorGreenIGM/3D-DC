@@ -145,3 +145,65 @@ void test_if_unfilter_works_to_read_and_unfilters_datas(const std::string &file_
     std::system(("code --diff " + file_path + " " + "out_unfilter_" + file_path).c_str());
     std::cout << "opening to see vs code difference okk--\n";
 }
+
+void _2D_get(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1)
+{
+    using namespace std::literals;
+    std::cout << "2D filtering file  " + file_path << "-------------------\n";
+
+    DCBuffer buffer(file_path, buffer_size); std::cout << "buffer init okk..........\n";
+    DCQueue queue(buffer, queue_size, mat_size); std::cout << "queue init okk..........\n";
+
+    auto build_nb = queue.build(del1, del2); std::cout << "queue build okk--\n";
+    
+    queue.filter(true, false); std::cout << "2D filter queue okk..........\n";
+
+    auto datas(queue.get_all_z()); std::cout << "retrieve datas in 2D okk..........\n";
+
+    auto add = "_2D_"s;
+ 
+    std::ofstream out("filtered_" + add + file_path, std::ios::binary);
+
+    for (const auto &v : datas)
+        out << std::noskipws << v;   
+}
+
+void _3D_get(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1)
+{
+    using namespace std::literals;
+    std::cout << "3D filtering file  " + file_path << "-------------------\n";
+
+    DCBuffer buffer(file_path, buffer_size); std::cout << "buffer init okk..........\n";
+    DCQueue queue(buffer, queue_size, mat_size); std::cout << "queue init okk..........\n";
+
+    auto build_nb = queue.build(del1, del2); std::cout << "queue build okk--\n";
+    
+    queue.filter(false, true); std::cout << "3D filter queue okk..........\n";
+
+    auto datas(queue.get_all_z()); std::cout << "retrieve datas in 3D okk..........\n";
+
+    auto add = "_3D_"s;
+ 
+    std::ofstream out("filtered_" + add + file_path, std::ios::binary);
+
+    for (const auto &v : datas)
+        out << std::noskipws << v;   
+}
+
+double progressive_entropy(const std::string &file_name, int matrix_size, int buffer_size, int queue_size, bool _2D, bool _3D)
+{
+    // init buffer and queue
+    DCBuffer buffer {file_name, buffer_size};
+    DCQueue queue {buffer, queue_size, matrix_size};
+    double _entropy = 0;
+    while(true)
+    {
+        auto built_nb = queue.build(2, 2);
+        queue.filter(_2D, _3D);
+        _entropy += queue.entropy();
+        if (built_nb < queue_size)
+            break;
+    }
+
+    return _entropy;
+}

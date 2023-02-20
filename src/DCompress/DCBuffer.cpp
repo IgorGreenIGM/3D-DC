@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstring>
 
-#include "../../include/Dcompress/DCBuffer.h"
+#include "../../include/Dcompress/DCBuffer.hpp"
 
 
 /**
@@ -12,20 +12,12 @@
  * @param buffer_size wanted size of the buffer
  * @exception std::runtime_error if can't open file specified at path
  */
-DCBuffer::DCBuffer(const std::string &file_path, int buffer_size)
+DCBuffer::DCBuffer(const std::string &file_path, int buffer_size) : buffer_size(buffer_size), in_fstream(std::ifstream(file_path.c_str(), std::ios::binary)),
+                                                                    locked(true), next_mrd_pos(0), m_stream_size(0), work_mode(WORK_MODE::f_mode), in_mstream(nullptr),
+                                                                    countdown(buffer_size)
 {
-    this->buffer_size = buffer_size; // buffer size
-    this->in_fstream = std::ifstream(file_path.c_str(), std::ios::binary | std::ios::in);  // opening file stream
-
     if(not in_fstream.is_open())
         throw std::runtime_error("Error, impossible to open file specified at location : " + file_path);
-    
-    this->locked = true;
-    this->next_mrd_pos = 0;
-    this->m_stream_size = 0;
-    this->work_mode = f_mode;
-    this->in_mstream = nullptr;
-    this->countdown = this->buffer_size;
 }
 
 
@@ -36,16 +28,11 @@ DCBuffer::DCBuffer(const std::string &file_path, int buffer_size)
  * @param mem_size input memory buffer size
  * @param buffer_size wanted size of the buffer
  */
-DCBuffer::DCBuffer(uint8_t *mem_ptr, int mem_size, int buffer_size)
+DCBuffer::DCBuffer(uint8_t *mem_ptr, int mem_size, int buffer_size) : buffer_size(buffer_size), in_mstream(mem_ptr), locked(true), next_mrd_pos(0), work_mode(WORK_MODE::m_mode),
+                                                                      m_stream_size(mem_size), countdown(buffer_size)
 {
-    this->buffer_size = buffer_size; // buffer size
-    this->in_mstream = mem_ptr; // storing input memory stream 
-
-    this->locked = true;
-    this->next_mrd_pos = 0;
-    this->work_mode = m_mode;
-    this->m_stream_size = mem_size;
-    this->countdown = this->buffer_size;
+    if (mem_ptr == nullptr)
+        throw std::runtime_error("error, can't initialize DCBuffer with nullptr");
 }
 
 
@@ -74,7 +61,7 @@ std::unique_ptr<uint8_t[]> DCBuffer::next_chunk_force(int &out_chunk_size) noexc
     // cause this method move datas from internal handler, it's necessarry to each call from necessary memory
     this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
 
-    if (this->work_mode == f_mode) // file stream working mode
+    if (this->work_mode == WORK_MODE::f_mode) // file stream working mode
     {   
         // copying stream data in internal data handler
         int i = 0;
@@ -138,7 +125,7 @@ std::unique_ptr<uint8_t[]> DCBuffer::next_chunk(int &out_chunk_size, double dela
     // cause this method move datas from internal handler, it's necessarry to each call from necessary memory
     this->mem_buf.reset(new uint8_t[this->buffer_size]); // buffer memory allocation
 
-    if (this->work_mode == f_mode) // file stream working mode
+    if (this->work_mode == WORK_MODE::f_mode) // file stream working mode
     {   
         // copying avaible stream data in internal data handler
         int i = 0;
