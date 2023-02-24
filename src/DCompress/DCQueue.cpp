@@ -1,8 +1,10 @@
 #include <cmath>
 #include <chrono>
+#include <assert.h>
 #include <thread>
 #include <future>
 #include <cstring>
+#include <iterator>
 #include <algorithm>
 #include <bits/unique_ptr.h>
 
@@ -22,6 +24,7 @@ DCQueue::DCQueue(DCBuffer &buffer, int queue_size, int matrix_size) : buf_ref(bu
 {
     if (queue_size <= 0)
         throw std::runtime_error("error cannot construct DCQueue with size = " + std::to_string(queue_size));
+
     if (matrix_size <= 0 or matrix_size == 1)
         throw std::runtime_error("error, cannot construct DCQUeue matrix size = " + std::to_string(matrix_size));
 }       
@@ -173,7 +176,7 @@ void DCQueue::swap(int id_1, int id_2)
  * @brief get all cells from the matrix in specific position
  * @return std::vector<uint8_t>
  */
-std::vector<uint8_t> DCQueue::get_z(int line, int col) const noexcept
+std::vector<uint8_t> DCQueue::z_get(int line, int col) const noexcept
 {
     std::vector<uint8_t> out;
     for(auto it = this->begin(); it != this->end() - 1; ++it) // excluding end_matrix
@@ -183,10 +186,10 @@ std::vector<uint8_t> DCQueue::get_z(int line, int col) const noexcept
 }
 
 /**
- * @brief get all cells in the Queue by z_axis
+ * @brief get all cells in the Queue by z_axis, excluding end_matrix
  * @return std::vector<uint8_t> 
  */
-std::vector<uint8_t> DCQueue::get_all_z() const noexcept
+std::vector<uint8_t> DCQueue::z_parse() const noexcept
 {
     std::vector<uint8_t> out;
     for (int line  = 0; line < this->matrix_size; ++line)
@@ -238,35 +241,73 @@ double DCQueue::entropy() const noexcept
 
 
 /**
- * @brief get all the elements inside the queue, excluding end matrix
- * @param filtred if the Queue is filtred at the moment of the call
- * @param unfiltred if the Queue is unfiltred at the moment of the call 
+ * @brief method to set DCQueue filters dictionnary
  * 
+ * @param dict_path input dictionnary path
+ * @exception std::runtime_error if cannot open open dictionnary file at specified path
+ */
+void DCQueue::set_filters_dict(const std::string &dict_path)
+{
+    std::ifstream dict_in(dict_path, std::ios::binary);
+    if(not dict_in.is_open())
+        throw std::runtime_error("Error, cannot open dictionnary file at location : " + dict_path);
+
+    dict_in.unsetf(std::ios::skipws); // desactivate '\n' skip
+    std::copy(std::istream_iterator<uint32_t>(dict_in), std::istream_iterator<uint32_t>(), std::back_inserter(this->filters_dict));
+}
+
+/**
+ * @brief method to set DCQueue filters dictionnary
+ * 
+ * @param dict_in input dictionnary 
+ * @exception std::runtime_error if cannot open open dictionnary file at specified path
+ */
+void DCQueue::set_filters_dict(const std::vector<uint32_t> &dict_in)
+{
+    std::copy(dict_in.begin(), dict_in.end(), std::back_inserter(this->filters_dict));
+}
+
+/**
+ * @brief get filters dicitonnary
+ * 
+ * @return const std::vector<uint32_t> 
+ */
+const std::vector<uint32_t> DCQueue::get_filters_dict()
+{
+    return this->filters_dict;
+}
+
+/**
+ * @brief clear filters dictionnary
+ * 
+ */
+void DCQueue::clear_filters_dict()
+{
+    this->filters_dict.clear();
+}
+
+/**
+ * @brief get all the elements inside the queue
  * @return std::vector<uint8_t> 
  */
-std::vector<uint8_t> DCQueue::get_linear(bool filtred, bool unfiltred) const noexcept
+std::vector<uint8_t> DCQueue::linear_parse() const noexcept
 {
-    std::vector<uint8_t> out; // output
+    std::vector<uint8_t> out;
 
-    if(filtred)
+    // getting data, excluding end_matrix and last matrix
+    for(auto it = this->begin(); it != this->end() - 2; ++it)
+        for(int i = 0; i < matrix_size; ++i)
+            for(int j = 0; j < matrix_size; ++j)
+                out.push_back(it->second[i][j]);
+    
+    // from end_matrix, computing the size of data written in the last matrix
+    int last_count = this->last_data_size();
+    if (last_count == 0)
+        for(int i = 0; i < matrix_size; ++i)
+            for(int j = 0; j < matrix_size; ++j)
+                out.push_back((this->end() - 2) ->second[i][j]);
+    else
     {
-        // getting data, excluding end_matrix
-        for(auto it = this->begin(); it != this->end() - 1; ++it)
-            for(int i = 0; i < matrix_size; ++i)
-                for(int j = 0; j < matrix_size; ++j)
-                    out.push_back(it->second[i][j]);
-    }
-    else if (not unfiltred) // meaning that Queue is not unfiltred and not filtred, can be used to check if build method works!
-    {
-        // getting data, excluding end_matrix and last matrix
-        for(auto it = this->begin(); it != this->end() - 2; ++it)
-            for(int i = 0; i < matrix_size; ++i)
-                for(int j = 0; j < matrix_size; ++j)
-                    out.push_back(it->second[i][j]);
-        
-        // from end_matrix, computing the size of data written in the last matrix
-        int last_count = this->last_data_size();
-
         // getting last datas on each line of last matrix
         for(int i = 0; i < std::floor(last_count / this->matrix_size); ++i)
             for(int j = 0; j < this->matrix_size; ++j)
@@ -275,37 +316,6 @@ std::vector<uint8_t> DCQueue::get_linear(bool filtred, bool unfiltred) const noe
         // getting last datas
         for(int i = 0; i < last_count - (std::floor(last_count / this->matrix_size) * this->matrix_size); ++i)
             out.push_back((this->end() - 2)->second[std::floor(last_count / this->matrix_size)][i]);
-    }
-    else // meaning that Queue is unfiltred
-    {
-        // getting data, excluding the end_matrix of the actual Queue, the unfiltred end_matrix, and the unfiltred last matrix  
-        for(auto it = this->begin(); it != this->end() - 3; ++it)
-            for(int i = 0; i < matrix_size; ++i)
-                for(int j = 0; j < matrix_size; ++j)
-                    out.push_back(it->second[i][j]);
-
-        // from unfiltred end_matrix, computing the size of data written in the last matrix
-        int last_count {0};
-        for (int i = 0; i < sizeof(int); ++i)
-            last_count += (this->end() - 2)->second[0][i] * std::pow(256, 3 - i);
-
-        if (last_count == 0) // meaning that the data size in the unfiltred last matrix is 0, we simple copy it
-        {
-            for(int i = 0; i < matrix_size; ++i)
-                for(int j = 0; j < matrix_size; ++j)
-                    out.push_back((this->end() - 3)->second[i][j]);
-        }
-        else
-        {
-            // getting last datas on each line of last matrix
-            for(int i = 0; i < std::floor(last_count / this->matrix_size); ++i)
-                for(int j = 0; j < this->matrix_size; ++j)
-                    out.push_back((this->end() - 3)->second[i][j]);
-
-            // getting last datas
-            for(int i = 0; i < last_count - (std::floor(last_count / this->matrix_size) * this->matrix_size); ++i)
-                out.push_back((this->end() - 3)->second[std::floor(last_count / this->matrix_size)][i]);   
-        }
     }
     return out;
 }
@@ -337,7 +347,7 @@ std::size_t DCQueue::last_data_size() const noexcept
 {
     std::size_t last_count(0);
 
-    auto end_content ((this->end() - 1)->second.get_linear()); // last matrix
+    const auto &end_content ((this->end() - 1)->second.get_linear()); // last matrix
     for (int i = 0; i < end_content.size() and i < sizeof(int); ++i)
         last_count += end_content[i] * std::pow(256, sizeof(int) - 1 - i); // no need to check endianess here, refers to DCQueue::build()
 
@@ -346,27 +356,24 @@ std::size_t DCQueue::last_data_size() const noexcept
 
 
 /**
- * @brief method for filtering the DCQueue
- * @details it consist to apply several filters on each matrix in the queue, excluding end_matrix
- * @details there are 02 types of filters : 2D filters and 3D filters. 
+ * @brief method to perform 2D filtering in the DCQueue.
+ * @details it consist to apply several 2Dfilters on each matrix in the queue, excluding end_matrix
  * @details 2D filters are applied on each single matrix in the Queue. avaible 2D filters are : NO, SUB, UP, AVERAGE and PAETH
- * @details 3D filters are applied on each specific cell in each matrix of the Queue. avaible 3D filters are : DC_NO, DC_SUB, DC_UP, DC_AVERAGE and DC_PAETH
- * @details the method apply each filter, and return a dictionnary containing the filters id that maximise datas redundancy(minimize entropy).
- * @details the method start by 2D filters after 3D. the the dictionnary will contain first 2D filters ids and the 3D, up to 256 filters are avaible.
+ * @details the method virtually apply each filter, and store to DCQueue filters dictionnary those that maximise datas redundancy(minimize entropy).
  * @details method now supports multithreading ! 
  * @see enum FILTER_MODE
- * @param _2D perform 2D filters
- * @param _3D perform 3D filters
  * 
- * @return std::vector<uint8_t> the filter dictionnary
+ * @exception std::runtime_error if the filter dictionnary is full.
  */
-std::vector<uint8_t> DCQueue::filter(bool _2D, bool _3D) noexcept
-{ 
+void DCQueue::_2D_filter()
+{
+    if (this->filters_dict.size() + this->matrix_size * this->counter >= this->filters_dict.max_size())
+        throw std::runtime_error("error, cannot more filter the Queue, this dictionnary is too much full");
+
     // 2d filter lambda function, return filtered line 
-    auto filter_line2D = [this](int filter_mode, DCQueue::iterator queue_it, const std::vector<uint8_t> &no_fltr_prev_line, int line) -> std::vector<uint8_t>
+    auto filter_line2D = [this](uint8_t filter_mode, DCQueue::iterator queue_it, const std::vector<uint8_t> &no_fltr_prev_line, int line) -> std::vector<uint8_t>
     {
         std::vector<uint8_t> filtred_line(this->matrix_size);
-        
         switch (filter_mode)
         {
             case FILTER_MODE::NO_2D :
@@ -427,11 +434,109 @@ std::vector<uint8_t> DCQueue::filter(bool _2D, bool _3D) noexcept
         return filtred_line;
     };
 
+    // lambda for parallelise 2D filtering
+    auto _2D_thread = [&filter_line2D, this](DCQueue::iterator start_it, DCQueue::iterator end_it, std::promise<std::pair<std::thread::id, std::vector<uint8_t>>> &prom) -> void
+    {
+        // thread local dictionnary 
+        std::vector<uint8_t> local_dict;
+
+        /* we'll perfrom 2D filtering on each line of each matrix and store the filter mode of the one with minimal entropy */
+        std::vector<uint8_t> no_fltr_prev_line;
+        std::vector<std::vector<uint8_t>> filtred_lines;  
+        for (auto queue_it = start_it; queue_it != end_it; ++queue_it)
+        {
+            for (int line = 0; line < this->matrix_size; ++line) 
+            {
+                filtred_lines.emplace_back(filter_line2D(FILTER_MODE::NO_2D, queue_it, {}, line));
+                filtred_lines.emplace_back(filter_line2D(FILTER_MODE::SUB_2D, queue_it, {}, line));
+                filtred_lines.emplace_back(filter_line2D(FILTER_MODE::UP_2D, queue_it, no_fltr_prev_line, line));
+                filtred_lines.emplace_back(filter_line2D(FILTER_MODE::AVERAGE_2D, queue_it, no_fltr_prev_line, line));
+                filtred_lines.emplace_back(filter_line2D(FILTER_MODE::PAETH_2D, queue_it, no_fltr_prev_line, line));
+
+                auto min = std::min_element(filtred_lines.begin(), filtred_lines.end(), [](const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
+                                                                                        {
+                                                                                            return _entropy(v1) < _entropy(v2);
+                                                                                        });
+                
+                local_dict.push_back(FILTER_MODE::NO_2D + std::distance(filtred_lines.begin(), min));
+                
+                // copying actual line(not yet filtered) of actual matrix as the next "not filtred previous"
+                std::swap(no_fltr_prev_line, queue_it->second[line]);
+                // writing filtered line into matrix
+                std::swap(queue_it->second[line], *min);
+
+                filtred_lines.clear();
+            }
+        }
+        // giving the result to promise
+        prom.set_value(std::make_pair(std::this_thread::get_id(), std::move(local_dict)));
+    };
+
+    // get CPU logical UC availbles and working range size
+    const unsigned int nb_threads = std::thread::hardware_concurrency();
+    const float range_size = static_cast<float>(this->counter) / nb_threads;
+    
+    if (range_size < 1) // starts single thread
+    {
+        std::promise<std::pair<std::thread::id, std::vector<uint8_t>>> prom; // promise            
+        std::thread th(_2D_thread, this->begin(), this->end() - 1, std::ref(prom)); // thread create...
+        th.join(); // waiting thread to finish 
+        auto result(prom.get_future().get()); // storing result
+        std::copy(result.second.begin(), result.second.end(), std::back_inserter(this->filters_dict)); 
+    }
+    else
+    {
+        int th_inc = 0;
+        std::vector<std::thread> threads;
+        std::vector<std::pair<std::thread::id, std::vector<uint8_t>>> results;
+        std::vector<std::promise<std::pair<std::thread::id, std::vector<uint8_t>>>> promises(nb_threads);
+
+        // create threads
+        for (th_inc = 1; th_inc < nb_threads; ++th_inc)
+            threads.emplace_back(_2D_thread, this->begin() + (th_inc - 1) * range_size, this->begin() + th_inc * range_size, std::ref(promises[th_inc - 1]));
+        threads.emplace_back(_2D_thread, this->begin() + (nb_threads - 1) * range_size, this->end() - 1, std::ref(promises[nb_threads - 1])); // this->end() - 1 for exclude end_matrix
+
+        for (th_inc = 0; th_inc < nb_threads; ++th_inc)
+            threads[th_inc].join();
+
+        for (th_inc = 0; th_inc < nb_threads; ++th_inc)
+            results.emplace_back(promises[th_inc].get_future().get());
+
+        /*to respect order of filtering when copying threads-local dictionnaries to output, we should sort the results by thread ids*/
+        std::sort(results.begin(), results.end(), [](const std::pair<std::thread::id, std::vector<uint8_t>> &p1, const std::pair<std::thread::id, std::vector<uint8_t>> &p2)
+                                                    {
+                                                        return p1.first < p2.first;
+                                                    });
+
+        // copying threads-local dictionnaries into Queue dictionnary
+        for (th_inc = 0; th_inc < nb_threads; ++th_inc)
+            std::move(results[th_inc].second.begin(), results[th_inc].second.end(), std::back_inserter(filters_dict));
+    }
+
+    // writing 2D filters group id
+    this->filters_dict.push_back(FILTER_GROUP_ID::_2D_FILTER);
+}
+
+
+/**
+ * @brief method to perform 3D filtering on the Queue.
+ * @details it consist to apply several 3D filters on each matrix in the queue, excluding end_matrix
+ * @details 3D filters are applied on each specific cell in each matrix of the Queue. avaible 3D filters are : DC_NO, DC_SUB, DC_UP, DC_AVERAGE and DC_PAETH
+ * @details the method apply each filter, and stores in the DCqueue filters dictionnary those that maximise datas redundancy(minimize entropy).
+ * @see enum FILTER_MODE
+ * 
+ * @exception std::runtime_error if the filter dictionnary is full.
+ */
+void DCQueue::_3D_filter()
+{
+    if (this->filters_dict.size() + this->matrix_size * this->matrix_size >= this->filters_dict.max_size())
+        throw std::runtime_error("error, cannot more filter the Queue, this dictionnary is too much full");
+
     // 3d filter lambda function, return filtred line 
-    auto filter_line3D = [this](int filter_mode, const std::vector<uint8_t> &no_fltr_prev_line, int line, int col) -> std::vector<uint8_t>
+    auto filter_line3D = [this](FILTER_MODE filter_mode, const std::vector<uint8_t> &no_fltr_prev_line, int line, int col) -> std::vector<uint8_t>
     {
         std::vector<uint8_t> filtred_line(this->counter);
-        auto z_line(this->get_z(line, col)); 
+        auto z_line(this->z_get(line, col)); 
         
         switch (filter_mode)
         {                        
@@ -492,145 +597,59 @@ std::vector<uint8_t> DCQueue::filter(bool _2D, bool _3D) noexcept
         return filtred_line;
     };
 
-    // **dictionnary output** 
-    std::vector<uint8_t> filter_dict; 
-    
-    if (_2D) // 2D perform
+    /* we'll now perfrom 2D filtering on each "z-line" and store the filter mode of the one with minimal entropy */
+    std::vector<std::vector<uint8_t>> filtred_lines; 
+    std::vector<uint8_t> no_fltr_prev_line(this->counter);
+
+    for (int line = 0; line < this->matrix_size; ++line)
     {
-        // lambda for parallelise 2D filtering
-        auto _2D_thread = [&filter_line2D, this](DCQueue::iterator start_it, DCQueue::iterator end_it, std::promise<std::pair<std::thread::id, std::vector<uint8_t>>> &prom) -> void
+        for (int col = 0; col < this->matrix_size; ++col)
         {
-            // thread local dictionnary 
-            std::vector<uint8_t> local_dict;
+            filtred_lines.emplace_back(filter_line3D(FILTER_MODE::NO_3D, {}, line, col));
+            filtred_lines.emplace_back(filter_line3D(FILTER_MODE::SUB_3D, {}, line, col));
+            filtred_lines.emplace_back(filter_line3D(FILTER_MODE::UP_3D, no_fltr_prev_line, line, col));
+            filtred_lines.emplace_back(filter_line3D(FILTER_MODE::AVERAGE_3D, no_fltr_prev_line, line, col));
+            filtred_lines.emplace_back(filter_line3D(FILTER_MODE::PAETH_3D, no_fltr_prev_line, line, col));
 
-            /* we'll perfrom 2D filtering on each line of each matrix and store the filter mode of the one with minimal entropy */
-            std::vector<uint8_t> no_fltr_prev_line;
-            std::vector<std::vector<uint8_t>> filtred_lines;  
-            for (auto queue_it = start_it; queue_it != end_it; ++queue_it)
+            auto min = std::min_element(filtred_lines.begin(), filtred_lines.end(), [](const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
+                                                                                    {
+                                                                                        return _entropy(v1) < _entropy(v2);
+                                                                                    });
+
+            this->filters_dict.push_back(FILTER_MODE::NO_3D + std::distance(filtred_lines.begin(), min));
+
+            int line_inc = 0;                
+            for(auto queue_it = this->begin(); queue_it != this->end() - 1; ++queue_it, ++line_inc)
             {
-                for (int line = 0; line < this->matrix_size; ++line) 
-                {
-                    filtred_lines.emplace_back(filter_line2D(FILTER_MODE::NO_2D, queue_it, {}, line));
-                    filtred_lines.emplace_back(filter_line2D(FILTER_MODE::SUB_2D, queue_it, {}, line));
-                    filtred_lines.emplace_back(filter_line2D(FILTER_MODE::UP_2D, queue_it, no_fltr_prev_line, line));
-                    filtred_lines.emplace_back(filter_line2D(FILTER_MODE::AVERAGE_2D, queue_it, no_fltr_prev_line, line));
-                    filtred_lines.emplace_back(filter_line2D(FILTER_MODE::PAETH_2D, queue_it, no_fltr_prev_line, line));
-
-                    auto min = std::min_element(filtred_lines.begin(), filtred_lines.end(), [](const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
-                                                                                            {
-                                                                                                return _entropy(v1) < _entropy(v2);
-                                                                                            });
-                    
-                    local_dict.push_back(FILTER_MODE::NO_2D + std::distance(filtred_lines.begin(), min));
-                    
-                    // copying actual line(not yet filtered) of actual matrix as the next "not filtred previous"
-                    std::swap(no_fltr_prev_line, queue_it->second[line]);
-                    // writing filtered line into matrix
-                    std::swap(queue_it->second[line], *min);
-
-                    filtred_lines.clear();
-                }
+                // copying actual "z_line"(not yet filtered) of actual matrix as the next "not filtred previous"
+                no_fltr_prev_line[line_inc] = queue_it->second[line][col];
+                
+                // writing filtered line into "z_line"
+                queue_it->second[line][col] = (*min)[line_inc];
             }
-            // giving the result to promise
-            prom.set_value(std::make_pair(std::this_thread::get_id(), std::move(local_dict)));
-        };
 
-        // get CPU logical UC availbles and working range size
-        const unsigned int nb_threads = std::thread::hardware_concurrency();
-        const float range_size = static_cast<float>(this->counter) / nb_threads;
-        
-        if (range_size < 1) // starts single thread
-        {
-            std::promise<std::pair<std::thread::id, std::vector<uint8_t>>> prom; // promise            
-            std::thread th(_2D_thread, this->begin(), this->end() - 1, std::ref(prom)); // thread create...
-            th.join(); // waiting thread to finish 
-            auto result(prom.get_future().get()); // storing result
-            filter_dict.swap(result.second); // copying to filter dictionnary 
-        }
-        else
-        {
-            int th_inc = 0;
-            std::vector<std::thread> threads;
-            std::vector<std::pair<std::thread::id, std::vector<uint8_t>>> results;
-            std::vector<std::promise<std::pair<std::thread::id, std::vector<uint8_t>>>> promises(nb_threads);
-
-            // create threads
-            for (th_inc = 1; th_inc < nb_threads; ++th_inc)
-                threads.emplace_back(_2D_thread, this->begin() + (th_inc - 1) * range_size, this->begin() + th_inc * range_size, std::ref(promises[th_inc - 1]));
-            threads.emplace_back(_2D_thread, this->begin() + (nb_threads - 1) * range_size, this->end() - 1, std::ref(promises[nb_threads - 1])); // this->end() - 1 for exclude end_matrix
-
-            for (th_inc = 0; th_inc < nb_threads; ++th_inc)
-                threads[th_inc].join();
-
-            for (th_inc = 0; th_inc < nb_threads; ++th_inc)
-                results.emplace_back(promises[th_inc].get_future().get());
-
-            /*to respect order of filtering when copying threads-local dictionnaries to output, we should sort the results by thread ids*/
-            std::sort(results.begin(), results.end(), [](const std::pair<std::thread::id, std::vector<uint8_t>> &p1, const std::pair<std::thread::id, std::vector<uint8_t>> &p2)
-                                                      {
-                                                            return p1.first < p2.first;
-                                                      });
-
-            // copying threads-local dictionnaries to output
-            for (th_inc = 0; th_inc < nb_threads; ++th_inc)
-                std::move(results[th_inc].second.begin(), results[th_inc].second.end(), std::back_inserter(filter_dict));
+            filtred_lines.clear();
         }
     }
-
-    if (_3D) // perform 3D
-    {
-        /* we'll now perfrom 2D filtering on each "z-line" and store the filter mode of the one with minimal entropy */
-        std::vector<std::vector<uint8_t>> filtred_lines; 
-        std::vector<uint8_t> no_fltr_prev_line(this->counter);
-
-        for (int line = 0; line < this->matrix_size; ++line)
-        {
-            for (int col = 0; col < this->matrix_size; ++col)
-            {
-                filtred_lines.emplace_back(filter_line3D(FILTER_MODE::NO_3D, {}, line, col));
-                filtred_lines.emplace_back(filter_line3D(FILTER_MODE::SUB_3D, {}, line, col));
-                filtred_lines.emplace_back(filter_line3D(FILTER_MODE::UP_3D, no_fltr_prev_line, line, col));
-                filtred_lines.emplace_back(filter_line3D(FILTER_MODE::AVERAGE_3D, no_fltr_prev_line, line, col));
-                filtred_lines.emplace_back(filter_line3D(FILTER_MODE::PAETH_3D, no_fltr_prev_line, line, col));
-
-                auto min = std::min_element(filtred_lines.begin(), filtred_lines.end(), [](const std::vector<uint8_t> &v1, const std::vector<uint8_t> &v2)
-                                                                                        {
-                                                                                            return _entropy(v1) < _entropy(v2);
-                                                                                        });
-
-                filter_dict.push_back(FILTER_MODE::NO_3D + std::distance(filtred_lines.begin(), min));
-
-                int line_inc = 0;                
-                for(auto queue_it = this->begin(); queue_it != this->end() - 1; ++queue_it, ++line_inc)
-                {
-                    // copying actual "z_line"(not yet filtered) of actual matrix as the next "not filtred previous"
-                    no_fltr_prev_line[line_inc] = queue_it->second[line][col];
-                    
-                    // writing filtered line into "z_line"
-                    queue_it->second[line][col] = (*min)[line_inc];
-                }
-
-                filtred_lines.clear();
-            }
-        }
-    }
-
-    return filter_dict;
+    // writing 3D filter group id in the filter dictionnary
+    this->filters_dict.push_back(FILTER_GROUP_ID::_3D_FILTER);
 }
 
 
 /**
- * @brief method for unfiltering the DCQueue using filter dictionnary 
- * 
- * @param filter_dict filter dictionnary 
- * @param _2D perform 2D unfilter
- * @param _3D perform 3D unfilter
+ * @brief method for unfiltering the DCQueue 
+ * @warning method use internal DCQueue filters dictionnary, then be sure to set the dictionnary 
+ * @warning this method will progressively empty the filter dictionnary, then for post-use it's programmer responsability to copy it. 
  * @exception std::runtime_error if invalid Filter id specified
+ * @exception std::runtime_error if filters dictionnary is empty
  */
-void DCQueue::unfilter(const std::vector<uint8_t> &filter_dict, bool _2D, bool _3D)
+void DCQueue::unfilter()
 {
+    if (this->filters_dict.empty())
+        throw std::runtime_error("cannot perform unfiltering if the filter dictionary is empty");
+
     // perform 2D unfilter lambda 
-    auto unfilter_line2D = [this](int filter_mode, std::vector<std::pair<int, DCMatrix>>::iterator queue_it, int line, const std::vector<uint8_t> &un_fltrd_prev_line) -> std::vector<uint8_t>
+    auto unfilter_line2D = [this](uint8_t filter_mode, std::vector<std::pair<int, DCMatrix>>::iterator queue_it, int line, const std::vector<uint8_t> &un_fltrd_prev_line) -> std::vector<uint8_t>
     {
         std::vector<uint8_t> unfiltred_line(this->matrix_size);
         switch (filter_mode)
@@ -692,9 +711,9 @@ void DCQueue::unfilter(const std::vector<uint8_t> &filter_dict, bool _2D, bool _
     };
 
     // lambda to perform 3D unfitering, no return, a reference must be passed in with the output will be copied
-    auto unfilter_line3D = [this](int filter_mode, int line, int col, const std::vector<uint8_t> &un_fltrd_prev_line) -> std::vector<uint8_t>
+    auto unfilter_line3D = [this](uint8_t filter_mode, int line, int col, const std::vector<uint8_t> &un_fltrd_prev_line) -> std::vector<uint8_t>
     {
-        const auto z_line(std::move(this->get_z(line, col))); // all deep cells
+        const auto z_line(std::move(this->z_get(line, col))); // all deep cells
         std::vector<uint8_t> unfiltred_line(z_line.size());
         
         switch (filter_mode)
@@ -755,200 +774,64 @@ void DCQueue::unfilter(const std::vector<uint8_t> &filter_dict, bool _2D, bool _
         return unfiltred_line;
     };
 
-    /*filter_inc indicates where 2D or 3D filters id starts in the filter dictionnary.
-    when filtering, if there 2D and 3D filters was performed, the order is 2D then 3D.
-    so to perform unfilter, we need(mathematically) to start by 3D filters. */
-    unsigned int filter_inc = 0;
-
-    if (_3D) // perform 3D
+    /**mathematicaly, performing unfilter must be made in the inverted order than the filtering,
+     * read the filters docs to understand how it's performed.
+    */
+    uint32_t group_id = 0, filter_inc = 0;
+    while (true)
     {
-        filter_inc = (not _2D) ? 0 : this->matrix_size * (this->counter);
+        // retrieve last fitered method id
+        group_id = this->filters_dict[this->filters_dict.size() - 1];
+        this->filters_dict.pop_back();
 
-        std::vector<uint8_t> un_fltrd_prev_line(this->counter); 
-        for (int line = 0; line < this->matrix_size; ++line)
+        if (group_id == FILTER_GROUP_ID::_3D_FILTER) // perform 3D
         {
-            for (int col = 0; col < this->matrix_size; ++col)
+            filter_inc = this->filters_dict.size() - this->matrix_size * this->matrix_size;
+
+            std::vector<uint8_t> un_fltrd_prev_line(this->counter);
+            for (int line = 0; line < this->matrix_size; ++line)
             {
-                // unfilter...
-                std::vector<uint8_t> unfiltred_line(unfilter_line3D(filter_dict[filter_inc], line, col, un_fltrd_prev_line));
+                for (int col = 0; col < this->matrix_size; ++col)
+                {
+                    // unfilter...
+                    std::vector<uint8_t> unfiltred_line(unfilter_line3D(this->filters_dict[filter_inc], line, col, un_fltrd_prev_line));
 
-                // writing unfiltered cells in queue, excluding the end_matrix
-                int i = 0;
-                for(auto it = this->begin(); it != this->end() - 1; ++it, ++i)
-                    it->second[line][col] = unfiltred_line[i];
-                // copying actual line(already unfiltered) of actual matrix as the next "unfiltred previous"
-                std::swap(unfiltred_line, un_fltrd_prev_line);
-
-                ++filter_inc;
+                    // writing unfiltered cells in queue, excluding the end_matrix
+                    int i = 0;
+                    for(auto it = this->begin(); it != this->end() - 1; ++it, ++i)
+                        it->second[line][col] = unfiltred_line[i];
+                    // copying actual line(already unfiltered) of actual matrix as the next "unfiltred previous"
+                    std::swap(unfiltred_line, un_fltrd_prev_line);
+                    ++filter_inc;
+                }
             }
+            this->filters_dict.erase(this->filters_dict.end() - this->matrix_size * this->matrix_size, this->filters_dict.end());
         }
-    }
-    
-    if (_2D)
-    {
-        filter_inc = 0;
-        
-        std::vector<uint8_t> un_fltrd_prev_line(this->matrix_size);
-        for(auto queue_it = this->begin(); queue_it != this->end() - 1; ++queue_it) // excluding end_matrix 
+
+        else if (group_id == FILTER_GROUP_ID::_2D_FILTER)
         {
-            for(int line = 0; line < this->matrix_size; ++line)
+            filter_inc = this->filters_dict.size() - this->matrix_size * this->counter; 
+
+            std::vector<uint8_t> un_fltrd_prev_line(this->matrix_size);
+            for(auto queue_it = this->begin(); queue_it != this->end() - 1; ++queue_it) // excluding end_matrix 
             {
-                // unfilter...
-                std::vector<uint8_t> unfiltred_line(unfilter_line2D(filter_dict[filter_inc], queue_it, line, un_fltrd_prev_line)); 
-                
-                // copying actual line(already filtered) of actual matrix as the next "un_filtred previous" 
-                std::copy(unfiltred_line.begin(), unfiltred_line.end(), un_fltrd_prev_line.begin());
-                // writing filtered line into matrix
-                std::copy(unfiltred_line.begin(), unfiltred_line.end(), queue_it->second[line].begin());
-
-                ++filter_inc;
+                for(int line = 0; line < this->matrix_size; ++line)
+                {
+                    // unfilter...
+                    std::vector<uint8_t> unfiltred_line(unfilter_line2D(filters_dict[filter_inc], queue_it, line, un_fltrd_prev_line)); 
+                    
+                    // copying actual line(already filtered) of actual matrix as the next "un_filtred previous" 
+                    std::copy(unfiltred_line.begin(), unfiltred_line.end(), un_fltrd_prev_line.begin());
+                    // writing filtered line into matrix
+                    std::copy(unfiltred_line.begin(), unfiltred_line.end(), queue_it->second[line].begin());
+                    ++filter_inc;
+                }
             }
+            this->filters_dict.erase(this->filters_dict.end() - this->matrix_size * this->counter, this->filters_dict.end());
         }
-    }
-}
-
-
-/**
- * @brief Method for filter and save an input file.
- * 
- * @param file_name input filer name
- * @param ids_file_out file name for filters ids output
- * @param filtred_file_out file name for filtred output 
- * @param matrix_size size of each matrix inside the Queue
- * @param buffer_size size of the buffer 
- * @param queue_size size of the Queue
- * @param _2D if 2D filter
- * @param _3D if 3D filter
- * @param buf_delay timer for getting data from buffer
- * @param queue_delay timer for building 
- * 
- * @exception std::runtime_error if error when creating output files
- */
-void DCQueue::filter_file(const std::string &file_name, const std::string &ids_file_out, const std::string &filtred_file_out, int matrix_size, int buffer_size, int queue_size, bool _2D, bool _3D, double buf_delay, double queue_delay)
-{
-    // init buffer and queue
-    DCBuffer buffer {file_name, buffer_size};
-    DCQueue queue {buffer, queue_size, matrix_size};
-    
-    // files outputs
-    std::ofstream filters_out(ids_file_out, std::ios::binary);
-    std::ofstream filtred_out(filtred_file_out, std::ios::binary);
-
-    if (not filters_out.is_open())
-        throw std::runtime_error("Error, cannot create filters output file at location : " + ids_file_out);
-
-    if (not filtred_out.is_open())
-        throw std::runtime_error("Error, cannot create unfiltred output file at location : " + filtred_file_out);
-    
-    while(true)
-    {
-        auto built_nb = queue.build(buf_delay, queue_delay);
-        
-        auto filters(queue.filter(_2D, _3D));
-        for (const  auto &f : filters)
-            filtred_out << std::noskipws << f;
-
-        auto all_datas(queue.get_linear(false, false));
-        for (const  auto &v : all_datas)
-            filtred_out << std::noskipws << v;
-
-        if (built_nb < queue_size)
+        else
             break;
-    }
-}
-
-
-/**
- * @brief Method for unfilter and save an input file.
- * 
- * @param file input filtred file name, **only name**, should not contain extension
- * @param ids_file_in filters file name, **only name**, should not contain extension
- * @param unfiltred_file_out file name of output
- * @param buf_delay timer for getting data from buffer
- * @param queue_delay timer for building Queue
- * 
- * @exception std::runtime_error if error when creating file or reading filters ids file
- */
-void DCQueue::unfilter_file(const std::string &file_name, const std::string &ids_file_in, const std::string &unfiltred_file_out, double buf_delay, double queue_delay)
-{
-    std::ifstream filters_in(ids_file_in + ".flt", std::ios::binary);
-    std::ofstream unfiltred_out(unfiltred_file_out, std::ios::binary);
-
-    if (not filters_in.is_open())
-        throw std::runtime_error("Error, cannot open filters file at location : " + ids_file_in + ".flt");
-
-    if (not unfiltred_out.is_open())
-        throw std::runtime_error("Error, cannot create unfiltred output file at location : " + unfiltred_file_out);
-
-    /* reading build info from filters file and reconvert it to base 10 integer */
-    uint8_t tmp;
-    int i = 0, matrix_size = 0, buffer_size = 0, queue_size = 0;
-    for(i = 0; i < sizeof(int); ++i)
-    {
-        filters_in >> std::noskipws >> tmp;
-        matrix_size += tmp * std::pow(256, 3 - i);
-    }
-
-    for(i = 0; i < sizeof(int); ++i) 
-    {
-        filters_in >> std::noskipws >> tmp;
-        buffer_size += tmp * std::pow(256, 3 - i);
-    }
-
-    for(i = 0; i < sizeof(int); ++i)
-    {
-        filters_in >> std::noskipws >> tmp;
-        queue_size += tmp * std::pow(256, 3 - i);
-    }
-
-    /* for decompression, buffer size must be a sub-multiple of total datas = (queue_size * matrix_size * matrix_size)
-    then we'll compute a buffer size which is a sub-multiple of total datas, and the closest one from buffer size used for filter. */
-    ++queue_size; // +1 for end_matrix from filtred data
-    const uint64_t total_datas = queue_size * matrix_size * matrix_size;
-    uint64_t up = buffer_size, dw = buffer_size; // we search from buffer_size then increase and decrease, and stop when finding the multiple .
-    while(true)
-    {
-        if (total_datas % up == 0) 
-            break;
-        ++up;
-    }
-    while(true)
-    {
-        if (total_datas % dw == 0)
-            break;
-        --dw;
-    }
-    buffer_size = (std::abs(up - buffer_size) < std::abs(dw - buffer_size)) ? up : dw; // the closest sub-multiple to buffer_size
-    
-    // buffer and queue init
-    DCBuffer buffer {file_name + ".flo", buffer_size};
-    DCQueue queue {buffer, queue_size, matrix_size};
-
-    int j = 0;
-    while(true)
-    {
-        int built_nb = queue.build(buf_delay, queue_delay);
-        
-        int filters_size = ((built_nb - 1) * matrix_size) + (matrix_size * matrix_size);
-        std::ofstream out("filter_used_" + std::to_string(j) + ".txt");
-        std::vector<uint8_t> filters(filters_size);
-        for (int i = 0; i < filters_size; ++i)
-            filters_in >> std::noskipws >> filters[i];
-        
-        queue.unfilter(filters, true, true);
-        const auto &unfiltred_datas = queue.get_linear(false, true);
-
-        for (const auto &v : unfiltred_datas)
-        {
-            unfiltred_out << std::noskipws << v;
-            out << std::to_string((int)v);
-        }
-
-        ++j;
-        if (built_nb < queue_size)
-            break;
-    }
-
-    filters_in.close();
-    unfiltred_out.close();
+    }    
+    // make sure to erase all
+    this->filters_dict.clear(); 
 }

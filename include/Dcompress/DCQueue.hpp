@@ -2,6 +2,7 @@
 #define _DC_QUEUE_H_INCLUDED_
 
 #include <map>
+#include <deque>
 #include <vector>
 #include <cmath>
 
@@ -18,32 +19,61 @@ class DCQueue : public std::vector<std::pair<int, DCMatrix>>
     public : 
         DCQueue(DCBuffer &buffer, int queue_size, int matrix_size);
 
-        double entropy() const noexcept;
-        void swap(int id_1, int id_2);
-        std::size_t build(double buf_delay, double queue_delay) noexcept; 
-        std::size_t last_data_size() const noexcept;
-        std::vector<uint8_t> get_all_z() const noexcept;
-        std::vector<uint8_t> get_all_linear() const noexcept;
-        std::vector<uint8_t> filter(bool _2D, bool _3D) noexcept;
-        std::vector<uint8_t> get_z(int line, int col) const noexcept;
-        void unfilter(const std::vector<uint8_t> &filters_dict, bool _2D, bool _3D);
-        std::vector<uint8_t> get_linear(bool filtred, bool unfiltred) const noexcept;
+        // filtering 
 
-        static void unfilter_file(const std::string&, const std::string&, const std::string&, double buf_delay = 1, double queue_delay = 1); // [BETA]
-        static void filter_file(const std::string&, const std::string&, const std::string&, int, int, int, bool, bool, double buf_delay = 1, double queue_delay = 1); // [BETA]
+        void unfilter();
+        void _2D_filter();
+        void _3D_filter();
+        void clear_filters_dict();
+        const std::vector<uint32_t> get_filters_dict();
+        void set_filters_dict(const std::string &dict_path);
+        void set_filters_dict(const std::vector<uint32_t> &dict_in);
+
+        // parsing
+
+        std::vector<uint8_t> z_parse() const noexcept;
+        std::vector<uint8_t> get_all_linear() const noexcept;
+        std::vector<uint8_t> z_get(int line, int col) const noexcept;
+        std::vector<uint8_t> linear_parse() const noexcept;
+
+        // building 
+
+        void swap(int id_1, int id_2);
+        double entropy() const noexcept;
+        std::size_t last_data_size() const noexcept;
+        std::size_t build(double buf_delay, double queue_delay) noexcept;
+
 
     private :
         int counter; // counter of builded matrix
         int queue_size; // size of the queue
         int matrix_size; // size of the matrix
         DCBuffer &buf_ref; // reference of the working-with buffer
+
+        std::vector<uint32_t> filters_dict; // dictionnary filter 
 };
 
-// never, never change the order of this enumaration
-enum FILTER_MODE {NO_2D, SUB_2D, UP_2D, AVERAGE_2D, PAETH_2D, // 2D filters ids
-                  NO_3D, SUB_3D, UP_3D, AVERAGE_3D, PAETH_3D // 3D filters ids
-                 };
+/** FILTER DOC
+ * @warning cause we'll need to unfilter the Queue(in reversed other than filter), we write the group id at the end to dict to facilitate unfilter.
+ * @warning then to unfilter ust need to read the last element which is the group id, decount number of written filters in the dict from end(according to filter group),
+ * @warning and use this postion as filters ids start.
+*/
 
+// used to identify order of filtering methods(2D, 3D, etc)
+enum FILTER_GROUP_ID 
+{
+    _2D_FILTER = 0x100,  // hex(256)
+    _3D_FILTER
+};
+
+/**
+ * @brief filters ids per filters groups
+ */
+enum FILTER_MODE 
+{ 
+    NO_2D, SUB_2D, UP_2D, AVERAGE_2D, PAETH_2D, // 2D filters ids
+    NO_3D, SUB_3D, UP_3D, AVERAGE_3D, PAETH_3D // 3D filters ids
+};
 
 inline bool is_big_endian()
 {
