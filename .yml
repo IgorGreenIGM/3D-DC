@@ -1,0 +1,2 @@
+- name: ChatGPT Code Review
+  uses: crnvl96/openai-ci-golang@v1.0.4
