@@ -2,57 +2,36 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <iterator>
 #include <sys/stat.h>
+#include <algorithm>
 #include <limits>
 
 #include <thread>
 #include "../include/UnaryTests.hpp"
 #include "../include/Dcompress/DCQueue.hpp"
-
-void evaluate_entropy(const std::string &file_1, const std::string &file_2)
-{
-    using namespace std::literals;
-
-    std::ifstream ofs1(file_1, std::ios::binary);
-    std::ifstream ofs2(file_2, std::ios::binary);
-
-    std::vector<uint8_t> datas_1, datas_2;
-    uint8_t tmp;
-
-    while(ofs1 >> tmp)
-        datas_1.push_back(tmp);
-    
-    while (ofs2 >> tmp)
-        datas_2.push_back(tmp);
-
-    std::cout << "entropy of file : "s + file_1 + " " + std::to_string(_entropy(datas_1)) << " entropy of file : "s + file_2 + " " + std::to_string(_entropy(datas_2)) << "\n";
-}
-
+using namespace std::literals;
 int main(int argc, char *argv[])
 {
     // argv[1] = file path + name, argv[2] = matrix size, argv[3] = queue size, argv[4] = 2D, argv[5] = 3D
     struct stat st;
     stat(argv[1], &st);
 
-    auto sc = std::chrono::steady_clock();
-    auto start = sc.now();
+    DCBuffer buf(argv[1], st.st_size);
+    DCQueue queue(buf, 10, 100);
+    queue.build(2, 2);
 
-    std::cout << "file size :  " << st.st_size << "\n";
-
-    std::ofstream o("_3D_.txt");
-    for (int mat_size = 2; mat_size <= 1000; ++mat_size)
+    for (int i = 0; i < 1; ++i)
     {
-        DCBuffer buf(argv[1], st.st_size);
-        DCQueue queue(buf, 10, mat_size);
-        queue.build(2, 2);
-        queue.filter(false, true);
-
-        o << mat_size << " " << queue.entropy() << std::endl;
-        std::cout << "sate : " << mat_size << " / 1000" << "\n";
+        queue._3D_filter();
+        // queue._2D_filter();
     }
 
+    std::ofstream o("out_"s + argv[1], std::ios::binary);
+    o.unsetf(std::ios::skipws);
 
-    std::cout << "time elapsed : " << static_cast<std::chrono::duration<double>>(sc.now() - start).count() << "\n";
+    const auto &v = queue.z_parse();
+    std::copy(v.begin(), v.end(), std::ostream_iterator<uint8_t>(o));
 
     return 0;
 };
