@@ -172,6 +172,7 @@ void DCQueue::swap(int id_1, int id_2)
     std::iter_swap(it_1, it_2);
 }
 
+
 /**
  * @brief get all cells from the matrix in specific position
  * @return std::vector<uint8_t>
@@ -185,20 +186,6 @@ std::vector<uint8_t> DCQueue::z_get(int line, int col) const noexcept
     return out;
 }
 
-/**
- * @brief get all cells in the Queue by z_axis, excluding end_matrix
- * @return std::vector<uint8_t> 
- */
-std::vector<uint8_t> DCQueue::z_parse() const noexcept
-{
-    std::vector<uint8_t> out;
-    for (int line  = 0; line < this->matrix_size; ++line)
-        for(int col = 0; col < this->matrix_size; ++col)
-            for (auto it = this->begin(); it != this->end() - 1; ++it) // ecluding end_matrix
-                out.push_back(it->second[line][col]);
-    
-    return out;
-}
 
 /**
  * @brief get entropy of the whole Queue, excluding end_matrix and zero-completion values
@@ -227,16 +214,16 @@ double DCQueue::entropy() const noexcept
         ++frequency[(this->end() - 2)->second[std::floor(last_count / this->matrix_size)][i]];
 
     // compute
-    double _entropy = .0;
+    double entropy = .0;
     double length = static_cast<double>((this->counter - 1) * this->matrix_size * this->matrix_size + last_count); // excluding zero-completion values
     std::cout << "computed : " << (int)length << "\n";
     for(const auto &freq : frequency)
     {
         double p_x = static_cast<double>(freq.second) / length;
-        _entropy -= p_x * std::log2f(p_x);  
+        entropy -= p_x * std::log2f(p_x);  
     }
 
-    return _entropy;
+    return entropy;
 }
 
 
@@ -286,8 +273,11 @@ void DCQueue::clear_filters_dict()
     this->filters_dict.clear();
 }
 
+
 /**
- * @brief get all the elements inside the queue
+ * @brief get all the elements inside the queue, excluding end_matrix.
+ * @warning This method return result according to end_matrix.
+ * @warning So that the size of the result is exactly the size of data written in DCQueue when building.
  * @return std::vector<uint8_t> 
  */
 std::vector<uint8_t> DCQueue::linear_parse() const noexcept
@@ -335,6 +325,50 @@ std::vector<uint8_t> DCQueue::get_all_linear() const noexcept
                 out.push_back(it->second[i][j]);
 
     return out;
+}
+
+
+/**
+ * @brief method to parse the DCQueue, excluding end_matrix
+ * 
+ * @param parser type of parser 
+ * 
+ * @return std::vector<uint8_t> containing the parsed result  
+ * @exception std::runtime_error if bad parser type specified
+ */
+std::vector<uint8_t> DCQueue::parse(PARSER parser) const
+{
+    std::vector<uint8_t> output;
+
+    switch (parser)
+    {
+        case PARSER::LINEAR_X : 
+            for(auto it = this->begin(); it != this->end() - 1; ++it)
+                for(int line = 0; line < this->matrix_size; ++line)
+                    for(int col = 0; col < this->matrix_size; ++col)
+                        output.push_back(it->second[line][col]);
+        break;
+
+        case PARSER::LINEAR_Y : 
+            for(auto it = this->begin(); it != this->end() - 1; ++it)
+                for (int col = 0; col < this->matrix_size; ++col)
+                    for (int line = 0; line < this->matrix_size; ++line)
+                        output.push_back(it->second[line][col]);
+        break;
+
+        case PARSER::LINEAR_Z :
+            for (int line  = 0; line < this->matrix_size; ++line)
+                for(int col = 0; col < this->matrix_size; ++col)
+                    for (auto it = this->begin(); it != this->end() - 1; ++it)
+                        output.push_back(it->second[line][col]);
+        break;
+
+        default:
+            std::runtime_error("Error, cannot parser with specified parser : " + std::to_string(static_cast<int>(parser)));
+        break;
+    }
+    
+    return output;
 }
 
 
@@ -523,6 +557,7 @@ void DCQueue::_2D_filter()
  * @details it consist to apply several 3D filters on each matrix in the queue, excluding end_matrix
  * @details 3D filters are applied on each specific cell in each matrix of the Queue. avaible 3D filters are : DC_NO, DC_SUB, DC_UP, DC_AVERAGE and DC_PAETH
  * @details the method apply each filter, and stores in the DCqueue filters dictionnary those that maximise datas redundancy(minimize entropy).
+ * @warning if there is less than 03 matrix inside the DCQueue, this method does nothing
  * @see enum FILTER_MODE
  * 
  * @exception std::runtime_error if the filter dictionnary is full.
@@ -531,6 +566,9 @@ void DCQueue::_3D_filter()
 {
     if (this->filters_dict.size() + this->matrix_size * this->matrix_size >= this->filters_dict.max_size())
         throw std::runtime_error("error, cannot more filter the Queue, this dictionnary is too much full");
+
+    if (this->counter < 3)
+        return;
 
     // 3d filter lambda function, return filtred line 
     auto filter_line3D = [this](FILTER_MODE filter_mode, const std::vector<uint8_t> &no_fltr_prev_line, int line, int col) -> std::vector<uint8_t>
@@ -597,7 +635,7 @@ void DCQueue::_3D_filter()
         return filtred_line;
     };
 
-    /* we'll now perfrom 2D filtering on each "z-line" and store the filter mode of the one with minimal entropy */
+    /* we'll now perfrom 3D filtering on each "z-line" and store the filter mode of the one with minimal entropy */
     std::vector<std::vector<uint8_t>> filtred_lines; 
     std::vector<uint8_t> no_fltr_prev_line(this->counter);
 
@@ -631,6 +669,7 @@ void DCQueue::_3D_filter()
             filtred_lines.clear();
         }
     }
+
     // writing 3D filter group id in the filter dictionnary
     this->filters_dict.push_back(FILTER_GROUP_ID::_3D_FILTER);
 }
@@ -777,11 +816,11 @@ void DCQueue::unfilter()
     /**mathematicaly, performing unfilter must be made in the inverted order than the filtering,
      * read the filters docs to understand how it's performed.
     */
-    uint32_t group_id = 0, filter_inc = 0;
+    uint32_t filter_inc = 0;
     while (true)
     {
         // retrieve last fitered method id
-        group_id = this->filters_dict[this->filters_dict.size() - 1];
+        uint32_t group_id = this->filters_dict[this->filters_dict.size() - 1];
         this->filters_dict.pop_back();
 
         if (group_id == FILTER_GROUP_ID::_3D_FILTER) // perform 3D
@@ -834,4 +873,49 @@ void DCQueue::unfilter()
     }    
     // make sure to erase all
     this->filters_dict.clear(); 
+}
+
+
+/**
+ * @brief method to filter and save file
+ * 
+ * @param file_path source file path 
+ * @param dest_path destination file path
+ * @param parser type of parser to use
+ * @param queue_size size of the DCQueue(byte)
+ * @param matrix_size size of the matrix inside DCQueue(byte)
+ * @param buffer_size size of the buffer(byte)
+ * 
+ * @see DCQueue::parse()
+ */
+void DCQueue::filter_file(const std::string &file_path, const std::string &dest_path, PARSER parser, int queue_size, int matrix_size, int buffer_size)
+{
+    std::ifstream src_in(file_path, std::ios::binary);
+    std::ofstream dest_out(dest_path, std::ios::binary);
+
+    if (not src_in.is_open())
+        throw std::runtime_error("Error, cannot open file at location : " + file_path);
+
+    if (not dest_out.is_open())
+        throw std::runtime_error("Error, cannot create output file at location : " + dest_path);
+
+    dest_out.unsetf(std::ios::skipws); // unset skipping
+
+    DCBuffer buf(file_path, buffer_size);
+    DCQueue queue(buf, queue_size, matrix_size);
+
+    while(true)
+    {
+        auto built_nb = queue.build(2, 2); 
+
+        queue._3D_filter();        
+
+        const auto &all_datas = queue.parse(parser);
+        std::copy(all_datas.begin(), all_datas.end(), std::ostream_iterator<uint8_t>(dest_out));
+
+        queue.clear_filters_dict(); // no need the filter dictionnary
+        
+        if (built_nb < queue_size)
+            break;
+    }
 }

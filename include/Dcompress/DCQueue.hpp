@@ -2,12 +2,21 @@
 #define _DC_QUEUE_H_INCLUDED_
 
 #include <map>
-#include <deque>
-#include <vector>
 #include <cmath>
+#include <vector>
 
 #include "./DCMatrix.hpp"
 #include "./DCBuffer.hpp"
+
+/**
+ * @brief parsers types of the DCQueue
+ * @see DCQueue::parse()
+ */
+enum class PARSER
+{
+    LINEAR_X, LINEAR_Y, LINEAR_Z    
+};
+
 /**
  * @brief class DCQueue
  * @note this class is the entry point of the compression / filtering.
@@ -28,13 +37,14 @@ class DCQueue : public std::vector<std::pair<int, DCMatrix>>
         const std::vector<uint32_t> get_filters_dict();
         void set_filters_dict(const std::string &dict_path);
         void set_filters_dict(const std::vector<uint32_t> &dict_in);
+        static void filter_file(const std::string &file_path, const std::string &dest_path, PARSER parser, int queue_size, int matrix_size, int buffer_size);
 
         // parsing
 
-        std::vector<uint8_t> z_parse() const noexcept;
+        std::vector<uint8_t> parse(PARSER parser) const;
+        std::vector<uint8_t> linear_parse() const noexcept;
         std::vector<uint8_t> get_all_linear() const noexcept;
         std::vector<uint8_t> z_get(int line, int col) const noexcept;
-        std::vector<uint8_t> linear_parse() const noexcept;
 
         // building 
 
@@ -67,7 +77,7 @@ enum FILTER_GROUP_ID
 };
 
 /**
- * @brief filters ids per filters groups
+ * @brief filters id's
  */
 enum FILTER_MODE 
 { 
@@ -75,6 +85,13 @@ enum FILTER_MODE
     NO_3D, SUB_3D, UP_3D, AVERAGE_3D, PAETH_3D // 3D filters ids
 };
 
+
+/**
+ * @brief check Hardware architecture endianess
+ * 
+ * @return true if big endian
+ * @return false otherwise
+ */
 inline bool is_big_endian()
 {
     int nb = 1;
@@ -83,20 +100,36 @@ inline bool is_big_endian()
     return (ptr[0] == 0);
 }
 
-// Paeth filter algorithm
+/**
+ * @brief Paeth filter algorithm
+ * 
+ * @param left left neighbour
+ * @param up up neighbour
+ * @param upperLeft upperleft neighbour 
+ * @return uint8_t predicted value
+ */
 inline uint8_t paeth_pred(uint8_t left, uint8_t up, uint8_t upperLeft)
 {
     int p = (left + up - upperLeft);
     int p_left = std::abs(p - left), p_up = std::abs(p - up), p_upperLeft = std::abs(p - upperLeft);
+
     if (p_left <= p_up && p_left <= p_upperLeft)
         return left;
+
     else if (p_up <= p_upperLeft)
         return up;
+        
     else
         return upperLeft;
 };
 
-// cardinality compute
+
+/**
+ * @brief compute the cardinality of a vector
+ * 
+ * @param vec input vector
+ * @return std::size_t cardinality 
+ */
 inline std::size_t cardinality(const std::vector<uint8_t> &vec)
 {
     std::vector<uint8_t> computed;
@@ -115,21 +148,26 @@ inline std::size_t cardinality(const std::vector<uint8_t> &vec)
     return computed.size();
 }
 
-// entroy compute
+/**
+ * @brief compute Shannon entropy of a vector
+ * 
+ * @param vec input vector
+ * @return double computed entropy
+ */
 inline double _entropy(const std::vector<uint8_t> &vec)
 {
     std::map<std::size_t, int> frequency;
     for (auto byte : vec)
         ++frequency[byte];
 
-    double _entropy = 0, length = static_cast<double>(vec.size());
+    double entropy = 0, length = static_cast<double>(vec.size());
     for (const auto &freq : frequency)
     {
         double p_x = static_cast<double>(freq.second) / length;
-        _entropy -= p_x * std::log2f(p_x);  
+        entropy -= p_x * std::log2f(p_x);  
     }
 
-    return _entropy;
+    return entropy;
 }
 
 #endif // _DC_QUEUE_H_INCLUDED_

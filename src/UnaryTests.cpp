@@ -67,7 +67,7 @@ void test_if_filter_then_unfilter_works(const std::string &file_path, int mat_si
 
     auto build_nb = queue.build(del1, del2); std::cout << "queue build okk--\n";
 
-    queue._3D_filter();   
+    // queue._2D_filter();   
     queue._3D_filter();   
     std::cout << "filter queue okk--\n";
 
@@ -158,14 +158,14 @@ void _2D_get(const std::string &file_path, int mat_size, int queue_size, int buf
     
     // queue.filter(true, false); std::cout << "2D filter queue okk..........\n";
 
-    auto datas(queue.z_parse()); std::cout << "retrieve datas in 2D okk..........\n";
+    // auto datas(queue.z_parse()); std::cout << "retrieve datas in 2D okk..........\n";
 
     auto add = "_2D_"s;
  
     std::ofstream out("filtered_" + add + file_path, std::ios::binary);
 
-    for (const auto &v : datas)
-        out << std::noskipws << v;   
+    // for (const auto &v : datas)
+        // out << std::noskipws << v;   
 }
 
 void _3D_get(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1)
@@ -180,14 +180,14 @@ void _3D_get(const std::string &file_path, int mat_size, int queue_size, int buf
     
     // queue.filter(false, true); std::cout << "3D filter queue okk..........\n";
 
-    auto datas(queue.z_parse()); std::cout << "retrieve datas in 3D okk..........\n";
+    // auto datas(queue.z_parse()); std::cout << "retrieve datas in 3D okk..........\n";
 
     auto add = "_3D_"s;
  
     std::ofstream out("filtered_" + add + file_path, std::ios::binary);
 
-    for (const auto &v : datas)
-        out << std::noskipws << v;   
+    // for (const auto &v : datas)
+        // out << std::noskipws << v;   
 }
 
 double progressive_entropy(const std::string &file_name, int matrix_size, int buffer_size, int queue_size, bool _2D, bool _3D)
