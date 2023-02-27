@@ -53,6 +53,17 @@ class DCQueue : public std::vector<std::pair<int, DCMatrix>>
         std::size_t last_data_size() const noexcept;
         std::size_t build(double buf_delay, double queue_delay) noexcept;
 
+        // setters
+
+        // return the number of build matrix in the Queue
+        int get_matrix_nb()const noexcept
+        {return this->counter;};
+        // return the size of the Queue
+        int get_queue_size() const noexcept
+        {return this->queue_size;};
+        // return the size of matrix inside the Queue
+        int get_matrix_size() const noexcept
+        {return this->matrix_size;};
 
     private :
         int counter; // counter of builded matrix
