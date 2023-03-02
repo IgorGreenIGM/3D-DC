@@ -27,7 +27,7 @@ DCMap::DCMap(const DCQueue &queue) : queue(queue)
  * @note I=(matrix:origin, line:origin, column:origin+1)
  * @note J=(matrix:origin+1, line:origin, column:origin)
  * @note K=(matrix:origin, line:origin-1, column:origin)
- * @note Which is a direct orthonormal cartesian system (O, I, J, K).
+ * @note Which define a direct orthonormal cartesian system (O, I, J, K).
  * 
  * @param queue reference to DCQueue that DCMap will overlay
  * @param origin origin of the coordinate system
@@ -45,9 +45,9 @@ DCMap::DCMap(const DCQueue &queue, DCPoint origin) : queue(queue), origin(origin
  * @param queue reference to DCQueue that DCMap will overlay
  * @param origin origin of the coordinate system
  * 
- * @param _I I point if the coordinate system 
- * @param _J J point if the coordinate system
- * @param _K K point if the coordinate system
+ * @param _I I point I the coordinate system 
+ * @param _J J point J the coordinate system
+ * @param _K K point K the coordinate system
  * @see DCMap::DCMap
  */
 DCMap::DCMap(const DCQueue &queue, const DCPoint &origin, const DCPoint &_I, 
@@ -58,18 +58,36 @@ DCMap::DCMap(const DCQueue &queue, const DCPoint &origin, const DCPoint &_I,
 
 
 /**
- * @brief transform input DCPoint from user-set system coordinate to DCQueue default coordinate.
+ * @brief convert input DCPoint from user system coordinate to DCQueue local coordinate system.
  * @note this solution was obtained mathematically.
  * @param point input point(in user sytem coordinate)
  * 
- * @return DCPoint transformed point
+ * @return DCPoint converted point
  */
-DCPoint DCMap::transform(const DCPoint &point) const noexcept
+DCPoint DCMap::to_local(const DCPoint &point) const noexcept
 {
     return 
     { origin.x + point.x * (I.x - origin.x) + point.y * (J.x - origin.x) + point.z * (K.x - origin.x),
       origin.y + point.x * (I.y - origin.y) + point.y * (J.y - origin.y) + point.z * (K.y - origin.y),
       origin.z + point.x * (I.z - origin.z) + point.y * (J.z - origin.z) + point.z * (K.z - origin.z)
+    };
+}
+
+/**
+ * @brief convert input DCPoint DCQueue local coordinate system to user system coordinate.
+ * 
+ * @note this solution was obtained mathematically.
+ * @param point input point(in local sytem coordinate)
+ * 
+ * @return convert transformed point
+ */
+DCPoint DCMap::to_user(const DCPoint &point) const noexcept
+{
+    auto det = (I.x - origin.x)*((K.z - origin.z)*(J.y - origin.y) - (J.z - origin.z)*(K.y - origin.y)) + (J.x - origin.x)*((I.z - origin.z)*(K.y - origin.y) - (K.z - origin.z)*(I.y - origin.y)) + (K.x - origin.x)*((J.z - origin.z)*(I.y - origin.y) - (I.z - origin.z)*(J.y - origin.y));
+    return
+    { ((J.x - origin.x)*((point.z - origin.z)*(K.y - origin.y) - (point.y - origin.y)*(K.z - origin.z)) + (K.x - origin.x)*((point.y - origin.y)*(J.z - origin.z) - (point.z - origin.z)*(J.y - origin.y)) + (point.x - origin.x)*((K.z - origin.z)*(J.y - origin.y) - (J.z - origin.z)*(K.y - origin.y))) / det,
+      ((I.x - origin.x)*(-(point.z - origin.z)*(K.y - origin.y) + (point.y - origin.y)*(K.z - origin.z)) + (K.x - origin.x)*(-(point.y - origin.y)*(I.z - origin.z) + (point.z - origin.z)*(I.y - origin.y)) + (point.x - origin.x)*(-(K.z - origin.z)*(I.y - origin.y) + (I.z - origin.z)*(K.y - origin.y))) / det,
+      ((I.x - origin.x)*((point.z - origin.z)*(J.y - origin.y) - (point.y - origin.y)*(J.z - origin.z)) + (J.x - origin.x)*((point.y - origin.y)*(I.z - origin.z) - (point.z - origin.z)*(I.y - origin.y)) + (point.x - origin.x)*((J.z - origin.z)*(I.y - origin.y) - (I.z - origin.z)*(J.y - origin.y))) / det
     };
 }
 
@@ -79,15 +97,15 @@ DCPoint DCMap::transform(const DCPoint &point) const noexcept
  * @note based on Bresenham Algorithm
  * @note A and B are included
  * 
- * @param A start point
- * @param B end point
+ * @param _A start point
+ * @param _B end point
  * @return std::vector<uint8_t> parsed result between A and B
  */
-std::vector<uint8_t> DCMap::range_parse(DCPoint A, DCPoint B)
+std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
 {
     // transform points coordinates to DCQueue coord-sys
-    A = this->transform(A); 
-    B = this->transform(B);
+    auto A = this->to_local(_A);
+    auto B = this->to_local(_B);
 
     std::vector<uint8_t> out; // output
     out.push_back(queue.at(A.x).second.at(A.y, A.z)); // start by A point included
@@ -165,6 +183,43 @@ std::vector<uint8_t> DCMap::range_parse(DCPoint A, DCPoint B)
             p2 += 2 * dx;            
             out.push_back(queue.at(A.x).second.at(A.y, A.z));
         }
+    }
+
+    return out;
+}
+
+/**
+ * @brief method to get all neighbours points that have the same value as the input 
+ * @param point input point 
+ * @param neighbours_nb radius distance
+ * @note input point is included will be included in the output
+ *  * 
+ * @return std::vector<DCPoint> neighbours points
+ */
+std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, unsigned int distance)
+{
+    auto p = this->to_local(point);
+    std::vector<DCPoint> out; // output
+
+    for (int mat = -distance; mat <= distance; ++mat) 
+    {
+        if (p.x + mat >= this->queue.get_matrix_nb() or p.x + mat < 0)
+            continue;
+
+        for (int line = -distance; line <= distance; ++line)    
+        {
+            if (p.y + line >= this->queue.get_matrix_size() or p.y + line < 0)
+                continue;
+            
+            for (int col = -distance; col <= distance; ++col)
+            {
+                if (p.y + col >= this->queue.get_matrix_size() or p.y + col < 0)
+                    continue;
+                else
+                    if (this->queue.at(p.x).second.at(p.y, p.z) == this->queue.at(p.x + mat).second.at(p.y + line, p.z + col))
+                        out.push_back(this->to_user({point.x + mat, point.y + line, point.z + col}));
+            }
+        }    
     }
 
     return out;
