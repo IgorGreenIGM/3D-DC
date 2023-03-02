@@ -2,6 +2,7 @@
 #define _UNARY_TEST_H_INCLUDED_
 
 #include <string>
+#include "../include/Dcompress/DCMap.hpp"
 
 void test_if_build_method_works_to_get_all_datas(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1);
 void test_if_filter_works_to_generate_filter_dictionnary(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1);
@@ -13,5 +14,7 @@ void _2D_get(const std::string &file_path, int mat_size, int queue_size, int buf
 void _3D_get(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1);
 
 double progressive_entropy(const std::string &file_name, int matrix_size, int buffer_size, int queue_size, bool _2D, bool _3D);
+
+void test_if_to_user_and_to_local_works(const DCMap &map);
 
 #endif // _UNARY_TEST_H_INCLUDED_

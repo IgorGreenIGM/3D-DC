@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <random>
 #include "../include/DCompress/DCQueue.hpp"
+#include "../include/DCompress/DCMap.hpp"
 
 /*SUCEFULLY PASSED CORRECTED SOME BUGS DUE TO END MATRIX DATAS READ */
 void test_if_build_method_works_to_get_all_datas(const std::string &file_path, int mat_size, int queue_size, int buffer_size, double del1 = 1, double del2 = 1)
@@ -206,4 +208,22 @@ double progressive_entropy(const std::string &file_name, int matrix_size, int bu
     }
 
     return _entropy;
+}
+
+// test if to_local() and to_user() coord system change methods works(). 
+void test_if_to_user_and_to_local_works(const DCMap &map)
+{
+    {
+        DCPoint point {rand()%10, rand()%10, rand()%10};
+        auto local = map.to_local(point);
+        auto neww = map.to_user(local);
+
+        if (point != neww)
+            throw std::runtime_error("Error in unary test : comparison between localized and user-ed values are wrong");
+
+        std::cout << "---------------------------------------------------------------------------------------------\n";
+         std::cout << "Initial coords : " << point << "\n";
+         std::cout << "changed coords : " << local << "\n"; 
+         std::cout << "new coords : " << neww << "\n"; 
+    }
 }
