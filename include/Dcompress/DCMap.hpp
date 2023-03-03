@@ -58,7 +58,7 @@ class DCMap
         DCPoint to_local(const DCPoint &point) const noexcept;
         DCPoint to_user(const DCPoint &point) const noexcept;
         std::vector<uint8_t> range_parse(const DCPoint &_A, const DCPoint &_B);
-        std::vector<DCPoint> eq_neighbours(const DCPoint &point, unsigned int distance);
+        std::vector<DCPoint> eq_neighbours(const DCPoint &point, int distance);
 
     private : 
         const DCQueue &queue;

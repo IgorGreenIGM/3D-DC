@@ -79,7 +79,7 @@ DCPoint DCMap::to_local(const DCPoint &point) const noexcept
  * @note this solution was obtained mathematically.
  * @param point input point(in local sytem coordinate)
  * 
- * @return convert transformed point
+ * @return converted point
  */
 DCPoint DCMap::to_user(const DCPoint &point) const noexcept
 {
@@ -196,7 +196,7 @@ std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
  *  * 
  * @return std::vector<DCPoint> neighbours points
  */
-std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, unsigned int distance)
+std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, int distance)
 {
     auto p = this->to_local(point);
     std::vector<DCPoint> out; // output
@@ -210,14 +210,15 @@ std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, unsigned int dis
         {
             if (p.y + line >= this->queue.get_matrix_size() or p.y + line < 0)
                 continue;
-            
+
             for (int col = -distance; col <= distance; ++col)
             {
-                if (p.y + col >= this->queue.get_matrix_size() or p.y + col < 0)
+                if (p.z + col >= this->queue.get_matrix_size() or p.z + col < 0)
                     continue;
+
                 else
                     if (this->queue.at(p.x).second.at(p.y, p.z) == this->queue.at(p.x + mat).second.at(p.y + line, p.z + col))
-                        out.push_back(this->to_user({point.x + mat, point.y + line, point.z + col}));
+                        out.push_back(this->to_user({p.x + mat, p.y + line, p.z + col}));
             }
         }    
     }
