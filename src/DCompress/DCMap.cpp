@@ -45,9 +45,9 @@ DCMap::DCMap(const DCQueue &queue, DCPoint origin) : queue(queue), origin(origin
  * @param queue reference to DCQueue that DCMap will overlay
  * @param origin origin of the coordinate system
  * 
- * @param _I I point I the coordinate system 
- * @param _J J point J the coordinate system
- * @param _K K point K the coordinate system
+ * @param _I I point of the coordinate system 
+ * @param _J J point of the coordinate system
+ * @param _K K point of the coordinate system
  * @see DCMap::DCMap
  */
 DCMap::DCMap(const DCQueue &queue, const DCPoint &origin, const DCPoint &_I, 
@@ -83,32 +83,36 @@ DCPoint DCMap::to_local(const DCPoint &point) const noexcept
  */
 DCPoint DCMap::to_user(const DCPoint &point) const noexcept
 {
-    auto det = (I.x - origin.x)*((K.z - origin.z)*(J.y - origin.y) - (J.z - origin.z)*(K.y - origin.y)) + (J.x - origin.x)*((I.z - origin.z)*(K.y - origin.y) - (K.z - origin.z)*(I.y - origin.y)) + (K.x - origin.x)*((J.z - origin.z)*(I.y - origin.y) - (I.z - origin.z)*(J.y - origin.y));
+    const auto xi = I.x - origin.x, xj = J.x - origin.x, xk = K.x - origin.x, px = point.x - origin.x;
+    const auto yi = I.y - origin.y, yj = J.y - origin.y, yk = K.y - origin.y, py = point.y - origin.y;
+    const auto zi = I.z - origin.z, zj = J.z - origin.z, zk = K.z - origin.z, pz = point.z - origin.z;
+
+    const auto det = xi*zk*yj - zj*yk + xj*zi*yk - zk*yi + xk*zj*yi - zi*yj;
     return
-    { ((J.x - origin.x)*((point.z - origin.z)*(K.y - origin.y) - (point.y - origin.y)*(K.z - origin.z)) + (K.x - origin.x)*((point.y - origin.y)*(J.z - origin.z) - (point.z - origin.z)*(J.y - origin.y)) + (point.x - origin.x)*((K.z - origin.z)*(J.y - origin.y) - (J.z - origin.z)*(K.y - origin.y))) / det,
-      ((I.x - origin.x)*(-(point.z - origin.z)*(K.y - origin.y) + (point.y - origin.y)*(K.z - origin.z)) + (K.x - origin.x)*(-(point.y - origin.y)*(I.z - origin.z) + (point.z - origin.z)*(I.y - origin.y)) + (point.x - origin.x)*(-(K.z - origin.z)*(I.y - origin.y) + (I.z - origin.z)*(K.y - origin.y))) / det,
-      ((I.x - origin.x)*((point.z - origin.z)*(J.y - origin.y) - (point.y - origin.y)*(J.z - origin.z)) + (J.x - origin.x)*((point.y - origin.y)*(I.z - origin.z) - (point.z - origin.z)*(I.y - origin.y)) + (point.x - origin.x)*((J.z - origin.z)*(I.y - origin.y) - (I.z - origin.z)*(J.y - origin.y))) / det
+    { (xj*(pz*yk - py*zk) + xk*(py*zj - pz*yj) + px*(zk*yj - zj*yk)) / det,
+      (xi*(-pz*yk + py*zk) + xk*(-py*zi + pz*yi) + px*(-zk*yi + zi*yk)) / det,
+      (xi*(pz*yj - py*zj) + xj*(py*zi - pz*yi) + px*(zj*yi - zi*yj)) / det
     };
 }
 
 
 /**
- * @brief Method to get all elements inside the matrix on a specific segment [AB]
+ * @brief get all elements inside the DCQueue on a specific segment [AB]
  * @note based on Bresenham Algorithm
- * @note A and B are included
+ * @note A and B will be included in the output
  * 
  * @param _A start point
  * @param _B end point
  * @return std::vector<uint8_t> parsed result between A and B
  */
-std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
+std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B) const noexcept
 {
     // transform points coordinates to DCQueue coord-sys
     auto A = this->to_local(_A);
     auto B = this->to_local(_B);
 
     std::vector<uint8_t> out; // output
-    out.push_back(queue.at(A.x).second.at(A.y, A.z)); // start by A point included
+    out.push_back(queue[A.x].second(A.y, A.z)); // include A point
 
     int dx = std::abs(B.x - A.x), dy = std::abs(B.y - A.y), dz = std::abs(B.z - A.z);
     int xs = (B.x > A.x) ? 1 : -1;
@@ -135,11 +139,11 @@ std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
             }
             p1 += 2 * dy;
             p2 += 2 * dz;
-            out.push_back(queue.at(A.x).second.at(A.y, A.z));
+            out.push_back(queue[A.x].second(A.y, A.z));
         }
     }
     // Y-axis as driving axis
-    else if (dy >= dx && dy >= dz) 
+    else if (dy >= dx and dy >= dz) 
     {
         int p1 = 2 * dx - dy;
         int p2 = 2 * dz - dy;
@@ -158,7 +162,7 @@ std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
             }
             p1 += 2 * dx;
             p2 += 2 * dz;
-            out.push_back(queue.at(A.x).second.at(A.y, A.z));
+            out.push_back(queue[A.x].second(A.y, A.z));
         }
     }
     // Z-axis as driving axis
@@ -181,47 +185,62 @@ std::vector<uint8_t> DCMap::range_parse(const DCPoint &_A, const DCPoint &_B)
             }
             p1 += 2 * dy;
             p2 += 2 * dx;            
-            out.push_back(queue.at(A.x).second.at(A.y, A.z));
+            out.push_back(queue[A.x].second(A.y, A.z));
         }
     }
 
     return out;
 }
 
+
 /**
- * @brief method to get all neighbours points that have the same value as the input 
+ * @brief get all neighbours points that have the same value as the input 
  * @param point input point 
- * @param neighbours_nb radius distance
- * @note input point is included will be included in the output
+ * @param distance radius distance
+ * @note input point will be included in the output
  *  * 
  * @return std::vector<DCPoint> neighbours points
  */
-std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, int distance)
+std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, int distance) const noexcept
 {
-    auto p = this->to_local(point);
+    std::vector<DCPoint> out; // output
+    auto p = this->to_local(point); // convert to local system coord.
+
+    // bounds checking for x axis
+    auto dx_m = p.x - distance < 0 ? -p.x : -distance;
+    auto dx_p = (p.x + distance >= this->queue.get_matrix_nb()) ? this->queue.get_matrix_nb() - 1 - p.x : distance;
+    // bounds checking for y axis
+    auto dy_m = p.y - distance < 0 ? -p.y : -distance;
+    auto dy_p = (p.y + distance >= this->queue.get_matrix_size()) ? this->queue.get_matrix_size() - 1 - p.y : distance; 
+    // bounds checking for z axis 
+    auto dz_m = p.z - distance < 0 ? -p.z : -distance;
+    auto dz_p = (p.z + distance >= this->queue.get_matrix_size()) ? this->queue.get_matrix_size() - 1 - p.z : distance; 
+
+    for (int mat = dx_m; mat <= dx_p; ++mat) 
+        for (int line = dy_m; line <= dy_p; ++line)    
+            for (int col = dz_m; col <= dz_p; ++col)
+                if (this->queue[p.x].second(p.y, p.z) == this->queue[p.x+mat].second(p.y+line, p.z+col))
+                    // out.push_back({p.x+mat, p.y+line, p.z+col}); // local
+                    out.push_back(std::move(this->to_user({p.x+mat, p.y+line, p.z+col}))); // user
+                    
+    return out;
+}
+
+/**
+ * @brief get all points that have the same value as input
+ * @param value input value
+ * @return std::vector<DCPoint> 
+ */
+std::vector<DCPoint> DCMap::eq_points(uint8_t value) const noexcept
+{
     std::vector<DCPoint> out; // output
 
-    for (int mat = -distance; mat <= distance; ++mat) 
-    {
-        if (p.x + mat >= this->queue.get_matrix_nb() or p.x + mat < 0)
-            continue;
-
-        for (int line = -distance; line <= distance; ++line)    
-        {
-            if (p.y + line >= this->queue.get_matrix_size() or p.y + line < 0)
-                continue;
-
-            for (int col = -distance; col <= distance; ++col)
-            {
-                if (p.z + col >= this->queue.get_matrix_size() or p.z + col < 0)
-                    continue;
-
-                else
-                    if (this->queue.at(p.x).second.at(p.y, p.z) == this->queue.at(p.x + mat).second.at(p.y + line, p.z + col))
-                        out.push_back(this->to_user({p.x + mat, p.y + line, p.z + col}));
-            }
-        }    
-    }
-
+    for (int mat = 0; mat < this->queue.get_matrix_nb(); ++mat) 
+        for (int line = 0; line < this->queue.get_matrix_size(); ++line)    
+            for (int col = 0; col < this->queue.get_matrix_size(); ++col)
+                if (this->queue[mat].second(line, col) == value)
+                    // out.push_back({mat, line, col}); // local
+                    out.push_back(std::move(this->to_user({mat, line, col}))); // user
+                    
     return out;
 }
