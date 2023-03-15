@@ -10,13 +10,18 @@ class DCMatrix : private std::vector<std::vector<uint8_t>>
         explicit DCMatrix(const std::initializer_list<uint8_t> &list);
         explicit DCMatrix(const std::vector<std::vector<uint8_t>> &matrix);
         DCMatrix(uint8_t *buffer, int buf_size);
-        DCMatrix();
-        ~DCMatrix();
 
         void print() const noexcept;
         bool next_disp() noexcept;
         bool prev_disp() noexcept;
-        uint8_t at(int line, int col) const;
+
+        const uint8_t &operator()(std::size_t line, std::size_t col) const 
+        { 
+            return (*this)[line][col];
+        }
+        
+        uint8_t at(std::size_t line, std::size_t col) const;
+
         std::vector<uint8_t> get_linear() const noexcept;
 
         friend class DCQueue;
