@@ -43,7 +43,10 @@ $$
 \Phi(i) = \left( \lfloor \frac{i}{N^2} \rfloor, \quad \lfloor \frac{i \pmod{N^2}}{N} \rfloor, \quad i \pmod N \right)
 $$
 
-The data is restructured into a 3rd-order tensor $\mathbf{T} \in \mathcal{M}_{D,N,N}(\mathbb{F}_{2^8})$, where $D = \lceil L/N^2 \rceil$.
+The data is restructured into a 3rd-order tensor 
+$\mathbf{T} \in \mathcal{M}_{D,N,N}(\mathbb{F}_{2^8})$, 
+where 
+$D = \lceil L/N^2 \rceil$.
 
 ### 2. Manifold Optimization (Statistical Alignment)
 
