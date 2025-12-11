@@ -64,7 +64,9 @@ We define a set of differential operators $\mathcal{D} = \{ \nabla_{id}, \nabla_
 *   **Up (Gradient Z):** $\nabla_{up}(v) = v_{k,u,v} - v_{k-1,u,v}$
 *   **Paeth-3D (Planar Estimation):**
     Let $a = v_{k,u,v-1}$ (Left), $b = v_{k-1,u,v}$ (Back), $c = v_{k-1,u,v-1}$ (Back-Left).
+
     $$ \nabla_{paeth}(v) = v_{k,u,v} - \text{PaethPredictor}(a, b, c) $$
+    
     Where $\text{PaethPredictor}$ selects the neighbor closest to $p = a + b - c$.
 
 ### 4. Adaptive Kernel Selection
