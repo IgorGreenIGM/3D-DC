@@ -136,10 +136,6 @@ This project is an **experimental proof-of-concept** and remains **incomplete**.
 * **Work in Progress:** While the core logic for entropy reduction is functional, the full pipeline (including the final bitstream serialization and the decoding step) is not fully polished.
 * **Memory Overhead:** The current implementation uses Jagged Arrays (`std::vector<std::vector>`) for experimental flexibility, which incurs CPU cache misses compared to a flat-array implementation.
 
-## 📄 License
-
-This project is licensed under the **BSD 3-Clause License**. See the `LICENSE` file for details.
-
 ## ✨ Future Work Focus
 
 The `DCMap` abstraction extends beyond simple coordinate mapping; it establishes an **isometric embedding** of the linear storage space $\mathcal{L}$ into a discrete Euclidean metric space $\mathcal{E}^3$.
@@ -155,3 +151,8 @@ Since the dataset is discrete, we apply a **discretization operator** $\mathcal{
 $$ S_{sampled} = \{ \Phi^{-1}(\mathcal{D}(\gamma(t))) \mid t \in [0, 1] \} $$
 
 This formalism enables **Anisotropic Correlation Extraction**. Instead of being constrained to isotropic linear reads, the engine can extract correlations along arbitrary correlation vectors $\vec{v}$ (e.g., spectral diagonals, helical scans) to detect hidden structural periodicities orthogonal to the primary storage axis.
+
+
+## 📄 License
+
+This project is licensed under the **BSD 3-Clause License**. See the `LICENSE` file for details.
