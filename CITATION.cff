@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Mogou"
+  given-names: "Igor"
+title: "3D-DC: Volumetric Entropy Reduction Algorithm"
+version: 1.0.0
+date-released: 2025-12-11
+url: "https://github.com/IgorGreenIGM/3D-DC"

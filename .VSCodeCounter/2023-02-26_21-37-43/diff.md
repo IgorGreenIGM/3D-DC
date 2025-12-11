@@ -1,27 +1,28 @@
 # Diff Summary
 
-Date : 2023-01-31 18:32:55
+Date : 2023-02-26 21:37:43
 
 Directory c:\\Users\\pc\\Desktop\\C++\\DCompress
 
-Total : 3 files,  13 codes, 22 comments, 8 blanks, all 43 lines
+Total : 5 files,  20 codes, 11 comments, 5 blanks, all 36 lines
 
 [Summary](results.md) / [Details](details.md) / Diff Summary / [Diff Details](diff-details.md)
 
 ## Languages
 | language | files | code | comment | blank | total |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| C++ | 2 | 13 | 22 | 7 | 42 |
-| CUDA C++ | 1 | 0 | 0 | 1 | 1 |
+| C++ | 4 | 18 | 11 | 4 | 33 |
+| Makefile | 1 | 2 | 0 | 1 | 3 |
 
 ## Directories
 | path | files | code | comment | blank | total |
 | :--- | ---: | ---: | ---: | ---: | ---: |
-| . | 3 | 13 | 22 | 8 | 43 |
-| include | 1 | 0 | 0 | 1 | 1 |
-| include\\Dcompress | 1 | 0 | 0 | 1 | 1 |
-| src | 2 | 13 | 22 | 7 | 42 |
-| src (Files) | 1 | 0 | 12 | 2 | 14 |
-| src\\DCompress | 1 | 13 | 10 | 5 | 28 |
+| . | 5 | 20 | 11 | 5 | 36 |
+| . (Files) | 1 | 2 | 0 | 1 | 3 |
+| include | 2 | 1 | 3 | -2 | 2 |
+| include\\Dcompress | 2 | 1 | 3 | -2 | 2 |
+| src | 2 | 17 | 8 | 6 | 31 |
+| src (Files) | 1 | 9 | 1 | 2 | 12 |
+| src\\DCompress | 1 | 8 | 7 | 4 | 19 |
 
 [Summary](results.md) / [Details](details.md) / Diff Summary / [Diff Details](diff-details.md)

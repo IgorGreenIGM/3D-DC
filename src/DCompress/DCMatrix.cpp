@@ -1,11 +1,9 @@
 #include <cmath>
+#include <numeric>
 #include <algorithm>
+#include <unordered_map>
 
 #include "../../include/Dcompress/DCMatrix.hpp"
-
-DCMatrix::DCMatrix() : size(0), col_disp_count(0), line_disp_count(0), disp_limit(0)
-{
-}
 
 /**
  * @brief Construct a new DCMatrix::DCMatrix object, from initializer_list
@@ -58,6 +56,18 @@ DCMatrix::DCMatrix(const std::vector<std::vector<uint8_t>> &matrix)
         this->push_back(line);
 }
 
+DCMatrix::DCMatrix(uint8_t value, int size) 
+{
+    this->size = size;
+    this->col_disp_count = 0;
+    this->line_disp_count = 0;
+    this->disp_limit = fact(size); // limit for disposition counters
+
+    this->resize(size);
+    for (int i = 0; i < size; ++i)
+        (*this)[i].resize(size, value);
+}
+
 
 /**
  * @brief Construct a new DCMatrix::DCMatrix object, from input buffer
@@ -88,11 +98,6 @@ DCMatrix::DCMatrix(uint8_t *buffer, int buf_size)
         this->push_back(tmp);
         tmp.clear();
     }
-}
-
-
-DCMatrix::~DCMatrix()
-{
 }
 
 /**
@@ -155,7 +160,7 @@ void DCMatrix::print() const noexcept
 
 
 /**
- * @brief overriding the std::vector::at() method
+ * @brief overriding the std::vector::at() method. provide safe access.
  * 
  * @param line line of the matrix
  * @param col col of the matrix
@@ -163,10 +168,10 @@ void DCMatrix::print() const noexcept
  * @return value at specified position
  * @exception std::runtime_error if the matrix bounds are violated
  */
-uint8_t DCMatrix::at(int line, int col) const
+uint8_t DCMatrix::at(std::size_t line, std::size_t col) const
 {
     if (line < 0 or line >= this->size or col < 0 or col >= this->size)
-        throw std::runtime_error("error invalid matrix input : line=" + std::to_string(line) + " col=" + std::to_string(col));
+        throw std::runtime_error("error invalid matrix input : row=" + std::to_string(line) + " col=" + std::to_string(col));
 
     return (*this)[line][col];
 }   
@@ -183,6 +188,32 @@ std::vector<uint8_t> DCMatrix::get_linear() const noexcept
     for(int line = 0; line < this->size; ++line)
         for (int col = 0; col < this->size; ++col)
             out.push_back((*this)[line][col]);
-
+ 
     return out;
+}
+
+uint8_t DCMatrix::max() const noexcept 
+{
+    std::unordered_map<uint8_t, uint32_t> cpt;
+    for (int i = 0; i < this->size; ++i)
+        for (int j = 0; j < this->size; ++j)
+            ++cpt[(*this)[i][j]];
+
+    return std::max_element(cpt.begin(), cpt.begin(), [](const std::pair<uint8_t, uint32_t>& p1, const std::pair<uint8_t, uint32_t>& p2)
+                                                      {return p1.second < p2.second;})->first;
+
+}
+
+
+std::unordered_map<uint8_t, double> DCMatrix::prob_distribution() const noexcept
+{
+    std::unordered_map<uint8_t, double> prob_dist;
+    for (int i = 0; i < this->size; ++i)
+        for (int j = 0; j < this->size; ++j)
+            ++prob_dist[(*this)[i][j]];
+
+    for (auto &p : prob_dist)
+        p.second /= (this->size * this->size);
+
+    return prob_dist;
 }

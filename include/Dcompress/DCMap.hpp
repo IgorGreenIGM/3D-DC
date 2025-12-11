@@ -2,6 +2,7 @@
 #define _DC_MAP_INCLUDED_
 
 #include <ostream>
+#include <queue>
 #include "./DCQueue.hpp"
 
 
@@ -19,22 +20,22 @@ class DCPoint
 
         //setters
 
-        auto get_x() const noexcept {return this->x;};
-        auto get_y() const noexcept {return this->y;};
-        auto get_z() const noexcept {return this->z;};
+        inline auto get_x() const noexcept {return this->x;};
+        inline auto get_y() const noexcept {return this->y;};
+        inline auto get_z() const noexcept {return this->z;};
 
         // operators overloading
 
-        friend bool operator!=(const DCPoint &A, const DCPoint &B) { return A==B ? false : true;};
-        friend bool operator==(const DCPoint &A, const DCPoint &B) { return A.x == B.x and A.y == B.y and A.z == B.z;};
+        inline friend bool operator!=(const DCPoint &A, const DCPoint &B) { return A==B ? false : true;};
+        inline friend bool operator==(const DCPoint &A, const DCPoint &B) { return A.x == B.x and A.y == B.y and A.z == B.z;};
 
-        friend DCPoint operator+(const DCPoint &A, const DCPoint &B) { return DCPoint{A.x + B.x, A.y + B.y, A.z + B.z};}
-        friend DCPoint operator*(const DCPoint &A, const DCPoint &B) { return DCPoint{A.x * B.x, A.y * B.y, A.z * B.z};}
-        friend DCPoint operator*(const DCPoint &A, int multiplier) { return DCPoint{multiplier * A.x, multiplier * A.y, multiplier * A.z}; }
-        
-        friend std::ostream& operator<<(std::ostream &stream, const DCPoint &A) 
+        inline friend DCPoint operator+(const DCPoint &A, const DCPoint &B) { return DCPoint{A.x + B.x, A.y + B.y, A.z + B.z};}
+        inline friend DCPoint operator*(const DCPoint &A, const DCPoint &B) { return DCPoint{A.x * B.x, A.y * B.y, A.z * B.z};}
+        inline friend DCPoint operator*(const DCPoint &A, int multiplier) { return DCPoint{multiplier * A.x, multiplier * A.y, multiplier * A.z}; }
+
+        inline friend std::ostream& operator<<(std::ostream &stream, const DCPoint &A) 
         { 
-            stream << "(" << A.get_x() << "," << A.get_y() << "," << A.get_z() << ")";
+            stream << "(" << A.x << "," << A.y << "," << A.z << ")";
             return stream;
         }
 };
@@ -55,10 +56,13 @@ class DCMap
         DCMap(const DCQueue &queue, DCPoint origin);
         DCMap(const DCQueue &queue, const DCPoint &origin, const DCPoint &_x, const DCPoint &_y, const DCPoint &_z);
 
-        DCPoint to_local(const DCPoint &point) const noexcept;
         DCPoint to_user(const DCPoint &point) const noexcept;
-        std::vector<uint8_t> range_parse(const DCPoint &_A, const DCPoint &_B);
-        std::vector<DCPoint> eq_neighbours(const DCPoint &point, int distance);
+        DCPoint to_local(const DCPoint &point) const noexcept;
+
+        std::vector<uint8_t> range_parse(const DCPoint &_A, const DCPoint &_B) const noexcept;
+        std::vector<DCPoint> eq_neighbours(const DCPoint &point, int distance) const noexcept;
+        std::vector<DCPoint> eq_points(uint8_t value) const noexcept;
+        std::vector<DCPoint> eq_pointss(uint8_t value) const noexcept;
 
     private : 
         const DCQueue &queue;
@@ -66,12 +70,10 @@ class DCMap
         DCPoint I, J, K;
 };
 
-/**
- * @details DCQueue local coordinate systems is as follw : 
- * origin=(matrix=0,line=0,column=0)
- * I:x_axis direction=(matrix=1,line=0,column=0)
- * J:y_axis direction=(matrix=0,line=1,column=0)
- * Z:z_axis direction=(matrix=0,line=0,column=1)
- */
+enum DIRECTION { 
+                F, B, U, D, J,     // front, back, up, down, jump
+                FU, FD, BU, BD, // front up, front down, back up, back down
+                NM, S              // next matrix, static
+                };
 
 #endif // _DC_MAP_INCLUDED_

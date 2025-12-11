@@ -1,14 +1,15 @@
 #include <cmath>
 #include <chrono>
-#include <assert.h>
 #include <thread>
 #include <future>
 #include <cstring>
+#include <assert.h>
 #include <iterator>
 #include <algorithm>
 #include <bits/unique_ptr.h>
 
 #include "../../include/Dcompress/DCQueue.hpp"
+#include "../../include/Dcompress/DCUtils.hpp"
 
 /**
  * @brief Construct a new DCQueue::DCQueue object 
@@ -126,13 +127,13 @@ std::size_t DCQueue::build(double buf_delay, double queue_delay) noexcept
             std::memcpy(tmp_buf, to_base256, 4);
         else
             for(int i = 0; i < sizeof(int); ++i)
-                tmp_buf[i] = to_base256[3 - i];
+                tmp_buf[i] = to_base256[sizeof(int) - 1 - i];
         
         this->emplace_back(-1, DCMatrix(tmp_buf, matrix_len));
         delete[] tmp_buf;
     }
     else // until there's no rest, we always build the end_matrix to zero completion
-    {
+    {   
         uint8_t *tmp_buf = new uint8_t[matrix_len];
         std::memset(tmp_buf, 0, matrix_len);
         this->emplace_back(-1, DCMatrix(tmp_buf, matrix_len));
@@ -224,6 +225,53 @@ double DCQueue::entropy() const noexcept
     }
 
     return entropy;
+}
+
+/**
+ * @brief get entropy of the whole Queue, excluding end_matrix and zero-completion values
+ * 
+ * @return std::size_t 
+ */
+double DCQueue::sd() const noexcept
+{
+    std::map<uint8_t, int> frequency;
+
+    // each line of each matrix excluding end matrix and last matrix
+    for (auto it = this->begin(); it != this->end() - 2; ++it) 
+        for (int line  = 0; line < this->matrix_size; ++line)
+            for(int col = 0; col < this->matrix_size; ++col)
+                ++frequency[it->second[line][col]];
+
+    auto last_count = this->last_data_size();
+
+    // each line of last matrix
+    for(int i = 0; i < std::floor(last_count / this->matrix_size); ++i)
+        for(int j = 0; j < this->matrix_size; ++j)
+            ++frequency[(this->end() - 2)->second[i][j]];
+
+    // last line
+    for(int i = 0; i < last_count - (std::floor(last_count / this->matrix_size) * this->matrix_size); ++i)
+        ++frequency[(this->end() - 2)->second[std::floor(last_count / this->matrix_size)][i]];
+
+    double sum = 0.0;
+    for (const auto& val : frequency) {
+        sum += val.second;
+    }
+    double mean = sum / frequency.size();
+
+    // Calculate the sum of squares of differences from the mean
+    double sq_diff_sum = 0.0;
+    for (const auto& val : frequency) {
+        sq_diff_sum += (val.second - mean) * (val.second - mean);
+    }
+
+    // Calculate the variance
+    double variance = sq_diff_sum / frequency.size();
+
+    // Calculate the standard deviation
+    double std_dev = std::sqrt(variance);
+
+    return std_dev;
 }
 
 
@@ -354,7 +402,7 @@ std::vector<uint8_t> DCQueue::parse(PARSER parser) const
                 for (int col = 0; col < this->matrix_size; ++col)
                     for (int line = 0; line < this->matrix_size; ++line)
                         output.push_back(it->second[line][col]);
-        break;
+        break;  
 
         case PARSER::LINEAR_Z :
             for (int line  = 0; line < this->matrix_size; ++line)
@@ -879,7 +927,7 @@ void DCQueue::unfilter()
 /**
  * @brief method to filter and save file
  * 
- * @param file_path source file path 
+ * @param src_path source file path 
  * @param dest_path destination file path
  * @param parser type of parser to use
  * @param queue_size size of the DCQueue(byte)
@@ -888,25 +936,25 @@ void DCQueue::unfilter()
  * 
  * @see DCQueue::parse()
  */
-void DCQueue::filter_file(const std::string &file_path, const std::string &dest_path, PARSER parser, int queue_size, int matrix_size, int buffer_size)
+void DCQueue::filter_file(const std::string &src_path, const std::string &dest_path, PARSER parser, int queue_size, int matrix_size, int buffer_size)
 {
-    std::ifstream src_in(file_path, std::ios::binary);
+    std::ifstream src_in(src_path, std::ios::binary);
     std::ofstream dest_out(dest_path, std::ios::binary);
 
     if (not src_in.is_open())
-        throw std::runtime_error("Error, cannot open file at location : " + file_path);
+        throw std::runtime_error("Error, cannot open file at location : " + src_path);
 
     if (not dest_out.is_open())
         throw std::runtime_error("Error, cannot create output file at location : " + dest_path);
 
     dest_out.unsetf(std::ios::skipws); // unset skipping
 
-    DCBuffer buf(file_path, buffer_size);
+    DCBuffer buf(src_path, buffer_size);
     DCQueue queue(buf, queue_size, matrix_size);
 
     while(true)
     {
-        auto built_nb = queue.build(2, 2); 
+        auto built_nb = queue.build(2, 2);
 
         queue._3D_filter();        
 
@@ -918,4 +966,99 @@ void DCQueue::filter_file(const std::string &file_path, const std::string &dest_
         if (built_nb < queue_size)
             break;
     }
+}
+
+void DCQueue::sort2() noexcept
+{
+    
+}
+
+void DCQueue::sort() noexcept 
+{
+    std::cout << "inside sorting algorithm . . . " << std::endl;
+
+    const auto &index = [this](int i, int j)
+    { return this->size() * i  -((i * (i + 1)) / 2) + j - (i + 1); };
+
+    std::cout << "starting computing probab ility vectors distances \n";
+    std::vector<std::unordered_map<uint8_t, double>> pdists;
+    for (int i = 0; i < this->size(); ++i)
+        pdists.push_back(std::move((*this)[i].second.prob_distribution()));
+
+    std::cout << "starting computing similarity matrixes \n"; 
+    // instead of using a 2D symetric matrix, we'll use a linear array
+    std::vector<double> sim_array((this->size() * (this->size() - 1)) / 2, .0);
+    for (int i = 0; i < this->size(); ++i)
+        for (int j = i + 1; j < this->size(); ++j)
+            sim_array[index(i, j)] = DCUtils::bhattacharyyan_distance(pdists[i], pdists[j]);
+
+    std::ofstream out("tmp2.txt");
+
+    for (int i = 0; i < this->size(); ++i)
+        for (int j = i + 1; j < this->size(); ++j)
+            out << "Queue["<< i <<"," << j << "] = " << sim_array[index(i, j)] << "\n";
+
+    out.close();
+    // std::cout << "Computing max ...\n";
+    // std::vector<double> dists;
+    // for(int i = 0; i < this->size(); ++i)
+    // {
+    //     const auto& matrix = (*this)[i].second;
+    //     const auto& zero = DCMatrix(matrix.max(), this->size());
+    //     const auto z = DCUtils::bhattacharyyan_distance(zero.prob_distribution(), pdists[i]);
+
+    //     double s(.0);
+    //     for (int j = 0; j < this->size(); ++j) 
+    //         if (i != j)
+    //             s += std::pow(sim_array[index(std::min(i, j), std::max(i, j))], 2.);
+
+    //     auto res = std::sqrt(s + std::pow(z, 2.));
+    //     std::cout << "result is : " << res << std::endl;
+    //     dists.push_back(res);
+    // }
+
+    /* std::vector<DCMatrix> zeros;
+    zeros.reserve(this->size());
+    for(const auto& matrix : *this)
+        zeros.emplace_back(DCMatrix(matrix.second.max(), this->matrix_size));
+
+    std::vector<double> dists(this->size());
+    for (const auto& matrix : *this)
+    for (int i = 0; i < this->size(); ++i)
+        dists[i] = DCUtils::bhattacharyyan_distance(zeros[i].prob_distribution(), (*this)[i].second.prob_distribution());
+
+    */// */std::sort(this->begin(), this->end(), [&dists](const std::pair<int, DCMatrix>& p1, const std::pair<int, DCMatrix>& p2)
+    //                                       {
+    //                                             return dists[p1.first] < dists[p2.first];
+    //                                       });
+
+    /*DCMatrix zero_matrix(max, 0);
+
+    const auto &index = [this](int i, int j)
+    { return this->size() * i  -((i * (i + 1)) / 2) + j - (i + 1); };
+
+    std::cout << "starting computing probability vectors distances \n";
+    std::vector<std::map<uint8_t, double>> pdists;
+    for (int i = 0; i < this->size(); ++i)
+        pdists.push_back(std::move((*this)[i].second.prob_distribution()));
+
+    std::cout << "starting computing similarity matrixes \n"; 
+    // instead of using a 2D symetric matrix, we'll use a linear array
+    std::vector<double> sim_array((this->size() * (this->size() - 1)) / 2, .0);
+    for (int i = 0; i < this->size(); ++i)
+        for (int j = i + 1; j < this->size(); ++j)
+            sim_array[index(i, j)] = DCUtils::bhattacharyyan_distance(pdists[i], pdists[j]);
+    
+    std::cout << "min is : " << *std::min(sim_array.begin(), sim_array.end()) << std::endl;
+    std::cout << "max is : " << *std::max(sim_array.begin(), sim_array.end()) << std::endl;
+    std::cout << "starting sorting ...." << std::endl;
+
+    
+
+    std::sort(this->begin(), this->end(), [&sim_array, &index](const std::pair<int, DCMatrix>& p1, const std::pair<int, DCMatrix>& p2) 
+                                          {
+                                                                                    
+                                          });
+    */
+    std::cout << "finished sorting.... end of sort method \n";
 }

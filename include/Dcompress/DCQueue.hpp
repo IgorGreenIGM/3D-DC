@@ -50,6 +50,7 @@ class DCQueue : public std::vector<std::pair<int, DCMatrix>>
 
         void swap(int id_1, int id_2);
         double entropy() const noexcept;
+        double sd() const noexcept;
         std::size_t last_data_size() const noexcept;
         std::size_t build(double buf_delay, double queue_delay) noexcept;
 
@@ -64,6 +65,10 @@ class DCQueue : public std::vector<std::pair<int, DCMatrix>>
         // return the size of matrix inside the Queue
         inline int get_matrix_size() const noexcept
         {return this->matrix_size;};
+
+        // sorting and regrouping
+        void sort() noexcept;
+        void sort2() noexcept;
 
     private :
         int counter; // counter of builded matrix
@@ -179,6 +184,23 @@ inline double _entropy(const std::vector<uint8_t> &vec)
     }
 
     return entropy;
+}
+
+inline double _variance(const std::vector<uint8_t>& vec)
+{
+    std::map<std::size_t, int> frequency;
+    for (auto byte : vec)
+        ++frequency[byte];
+
+    double variance = 0, length = static_cast<double>(vec.size());
+    double sum = 0.0, sumq = 0.0;
+    for (const auto &freq : frequency)
+    {
+        sum += freq.second;
+        sumq += freq.second*freq.second;
+    } 
+
+    return (sumq - (sum*sum / length)) / (length - 1.0); 
 }
 
 #endif // _DC_QUEUE_H_INCLUDED_

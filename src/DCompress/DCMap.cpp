@@ -1,4 +1,6 @@
+#include <list>
 #include <tuple>
+#include <queue>
 
 #include "../../include/Dcompress/DCMap.hpp"
 
@@ -233,6 +235,22 @@ std::vector<DCPoint> DCMap::eq_neighbours(const DCPoint &point, int distance) co
  */
 std::vector<DCPoint> DCMap::eq_points(uint8_t value) const noexcept
 {
+    std::vector<DCPoint> out; // output
+
+    for (int mat = 0; mat < this->queue.get_matrix_nb(); ++mat) 
+        for (int line = 0; line < this->queue.get_matrix_size(); ++line)    
+            for (int col = 0; col < this->queue.get_matrix_size(); ++col)
+                if (this->queue[mat].second(line, col) == value)
+                    // out.push_back({mat, line, col}); // local
+                    out.push_back(std::move(this->to_user({mat, line, col}))); // user
+                    
+    return out;
+}
+
+#include <set>
+std::vector<DCPoint> DCMap::eq_pointss(uint8_t value) const noexcept
+{
+    std::set<uint8_t> mset;
     std::vector<DCPoint> out; // output
 
     for (int mat = 0; mat < this->queue.get_matrix_nb(); ++mat) 

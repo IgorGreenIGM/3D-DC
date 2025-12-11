@@ -8,7 +8,7 @@ EXEC = bin/output.exe
 
 all : $(EXEC)
 
-$(EXEC): main.o DCMatrix.o DCBuffer.o DCQueue.o DCMap.o UnaryTests.o 
+$(EXEC): main.o DCMatrix.o DCBuffer.o DCQueue.o DCMap.o UnaryTests.o DCUtils.o
 		$(CC) -o $(EXEC) $^ $(LDFLAGS)
 
 main.o:	src/main.cpp
@@ -18,6 +18,10 @@ UnaryTests.o: src/UnaryTests.cpp
 		$(CC) -c $< $(CFLAGS)
 
 # DEEP COMPRESSION MODULE...
+
+DCUtils.o : src/DCompress/DCUtils.cpp
+		$(CC) -c $< $(CFLAGS)
+
 DCMatrix.o: src/DCompress/DCMatrix.cpp
 		$(CC) -c $< $(CFLAGS)
 

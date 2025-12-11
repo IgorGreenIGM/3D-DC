@@ -1,0 +1,17 @@
+"filename", "language", "Makefile", "C++", "Markdown", "Python", "JSON", "comment", "blank", "total"
+"c:\Users\pc\Desktop\C++\DCompress\Makefile", "Makefile", 27, 0, 0, 0, 0, 4, 14, 45
+"c:\Users\pc\Desktop\C++\DCompress\README.md", "Markdown", 0, 0, 3, 0, 0, 0, 2, 5
+"c:\Users\pc\Desktop\C++\DCompress\include\Dcompress\DCBuffer.hpp", "C++", 0, 30, 0, 0, 0, 1, 13, 44
+"c:\Users\pc\Desktop\C++\DCompress\include\Dcompress\DCMap.hpp", "C++", 0, 32, 0, 0, 0, 16, 10, 58
+"c:\Users\pc\Desktop\C++\DCompress\include\Dcompress\DCMatrix.hpp", "C++", 0, 29, 0, 0, 0, 0, 8, 37
+"c:\Users\pc\Desktop\C++\DCompress\include\Dcompress\DCQueue.hpp", "C++", 0, 102, 0, 0, 0, 52, 30, 184
+"c:\Users\pc\Desktop\C++\DCompress\include\UnaryTests.hpp", "C++", 0, 12, 0, 0, 0, 0, 5, 17
+"c:\Users\pc\Desktop\C++\DCompress\src\DCompress\DCBuffer.cpp", "C++", 0, 147, 0, 0, 0, 61, 27, 235
+"c:\Users\pc\Desktop\C++\DCompress\src\DCompress\DCMap.cpp", "C++", 0, 138, 0, 0, 0, 69, 18, 225
+"c:\Users\pc\Desktop\C++\DCompress\src\DCompress\DCMatrix.cpp", "C++", 0, 110, 0, 0, 0, 51, 27, 188
+"c:\Users\pc\Desktop\C++\DCompress\src\DCompress\DCQueue.cpp", "C++", 0, 603, 0, 0, 0, 176, 142, 921
+"c:\Users\pc\Desktop\C++\DCompress\src\UnaryTests.cpp", "C++", 0, 124, 0, 0, 0, 29, 56, 209
+"c:\Users\pc\Desktop\C++\DCompress\src\main.cpp", "C++", 0, 21, 0, 0, 0, 2, 6, 29
+"c:\Users\pc\Desktop\C++\DCompress\src\plotter.ipynb", "JSON", 0, 0, 0, 0, 361, 0, 1, 362
+"c:\Users\pc\Desktop\C++\DCompress\src\scrapper.py", "Python", 0, 0, 0, 30, 0, 7, 11, 48
+"Total", "-", 27, 1348, 3, 30, 361, 468, 370, 2607
