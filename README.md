@@ -7,7 +7,7 @@
 
 ## 🔬 Abstract
 
-**3D-DC** is a experimental research project exploring a novel approach to lossless data compression. Unlike traditional compressors (LZ77, Huffman) that treat files as linear streams, 3D-DC transforms binary data into **3D volumetric structures** (voxel grid).
+**3D-DC** is an experimental research project exploring a novel approach to lossless data compression. Unlike traditional compressors (LZ77, Huffman) that treat files as linear streams, 3D-DC transforms binary data into **3D volumetric structures** (voxel grid).
 
 The core hypothesis is that latent **topological correlations** exist not just sequentially, but spatially and "temporally" (depth-wise) within binary data. By projecting data into a 3D manifold, this algorithm utilizes geometric predictors and probability distribution sorting to significantly **reduce Shannon Entropy**, preparing the data for highly efficient final encoding.
 
