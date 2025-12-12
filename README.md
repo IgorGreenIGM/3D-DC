@@ -62,7 +62,7 @@ The algorithm approximates the solution to a Hamiltonian Path problem to find a 
 
 $$ \min_{\sigma} \sum_{k=0}^{D-2} d(\mathbf{T}_{\sigma(k)}, \mathbf{T}_{\sigma(k+1)}) $$
 
-### 3. Discrete Differential Operators (Predictors)
+### 3. Discrete Differential Operators
 
 We define a set of differential operators $\mathcal{D} = \{ \nabla_{id}, \nabla_{sub}, \nabla_{up}, \nabla_{paeth} \}$ operating on the voxel $v_{k,u,v}$ and its causal neighborhood $\mathcal{N}_{k,u,v}$. The 3D predictors utilize the aligned previous layer $k-1$:
 
@@ -82,7 +82,7 @@ For each voxel (or row vector), the algorithm selects the optimal operator $\del
 
 $$ \mathbf{R}_{k,u,v} = (\delta_{opt}(v_{k,u,v})) \pmod{256} $$
 
-### 5. Objective Function (Entropy Minimization)
+### 5. Objective Function :Entropy Minimization
 
 The efficiency of the transform is measured by the reduction of the zero-order empirical Shannon entropy:
 
@@ -105,7 +105,7 @@ This implies that the projection logic is effectively equivalent to writing the 
 * **2D:** $i \pmod{256^2}$ (Image/Matrix)
 * **3D:** $i \pmod{256^3}$ (Volumetric/3D-DC)
 
-### 7. Symbol Coalescing (Bit-Packing)
+### 7. Symbol Coalescing
 
 The filtering phase transforms a Uniform Distribution $\mathcal{U}(0, 255)$ into a Laplacian Distribution $\mathcal{L}(0, b)$. The residuals are small integers close to 0.
 However, storing a small residual (e.g., `1`) in a standard 8-bit byte wastes capacity ($H(x) \ll 8$).
