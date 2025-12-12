@@ -105,6 +105,18 @@ This implies that the projection logic is effectively equivalent to writing the 
 * **2D:** $i \pmod{256^2}$ (Image/Matrix)
 * **3D:** $i \pmod{256^3}$ (Volumetric/3D-DC)
 
+### 7. Symbol Coalescing (Bit-Packing)
+
+The filtering phase transforms a Uniform Distribution $\mathcal{U}(0, 255)$ into a Laplacian Distribution $\mathcal{L}(0, b)$. The residuals are small integers close to 0.
+However, storing a small residual (e.g., `1`) in a standard 8-bit byte wastes capacity ($H(x) \ll 8$).
+
+To approach the theoretical entropy limit, we apply **Frame-Of-Reference (FOR)** packing.
+For a block of residuals $B$, we determine the minimal bit-width $w$:
+
+$$ w = \lceil \log_2(\max(|B|)) \rceil $$
+
+The block is then serialized into a compact bitstream where each symbol occupies exactly $w$ bits. This step bridges the gap between the theoretical entropy reduction achieved by 3D-DC and the actual file size reduction.
+
 ## 🛠️ Software Architecture
 
 The project is built around three core C++ components:
@@ -113,7 +125,7 @@ The project is built around three core C++ components:
 2. **`DCQueue` (The Volume)**: The central data structure acting as a "cube" of matrices. It handles the 2D/3D filtering logic and manages the filter dictionary.
 3. **`DCMap` (The Geometry)**: A geometric overlay providing an orthonormal Cartesian system to navigate the `DCQueue` using coordinate mathematics without duplicating memory.
 
-## 📦 Installation & Usage
+## 📦 Installation
 
 ### Prerequisites
 
