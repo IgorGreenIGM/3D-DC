@@ -80,7 +80,7 @@ We define a set of differential operators $\mathcal{D} = \{ \nabla_{id}, \nabla_
 
 For each voxel (or row vector), the algorithm selects the optimal operator $\delta_{opt} \in \mathcal{D}$ that minimizes the local residual magnitude. The final residual tensor $\mathbf{R}$ is computed in $\mathbb{F}_{2^8}$:
 
-$$ \mathbf{R}_{k,u,v} = (\delta_{opt}(v_{k,u,v})) \pmod{256} $$
+$$\mathbf{R}_{k,u,v} = (\delta_{opt}(v_{k,u,v})) \pmod{256}$$
 
 ### 5. Objective Function :Entropy Minimization
 
