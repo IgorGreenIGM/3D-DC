@@ -1,6 +1,7 @@
 # 3D-DC: Volumetric Entropy Reduction Algorithm
 
 ![C++](https://img.shields.io/badge/C++-17%2F20-blue.svg)
+![Status](https://img.shields.io/badge/Type-Personnal_Project-green.svg)
 ![Status](https://img.shields.io/badge/Status-Research%20Prototype-orange.svg)
 ![Field](https://img.shields.io/badge/Field-Data_Compression-purple.svg)
 ![License](https://img.shields.io/badge/License-BSD_3--Clause-green.svg)
